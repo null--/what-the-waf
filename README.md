@@ -6,7 +6,7 @@ local jruby version: 1.5.6
 OS: Debian Jessie (powered by both Debian Testing and Kali-Bleeding-Edge repos)  
 
 #Installation
-Download jruby-complete jar file from [http://www.jruby.org/download]  
+Download jruby-complete jar file from [JRuby](http://www.jruby.org/download)  
 Open the "Burp Suite"  
 Go to "Extender"  
 Go to "Options"  
@@ -18,14 +18,18 @@ Click "Select File" and choose "\[foo\]/\[bar\]/what-the-waf.rb"
 
 #Quickref
 
-###Compile burp's jruby script
-*jruby HelloWorld.rb -J" -cp burp"*  
+## Usage
+\[TODO\]
 
-###Build jar
-*rm -r burp  
+## Development
+######Compile burp's jruby script
+jruby HelloWorld.rb -J" -cp burp"  
+
+######Build jar
+rm -r burp  
 mkdir burp  
 javac -d burp/ burp-src/\*.java  
 jruby doc/HelloWorld.rb  
 jrubyc doc/HelloWorld.rb  
 cp HelloWorld.class burp/  
-jar cvf HelloWorld.jar burp/\*.class*  
+jar cvf HelloWorld.jar burp/\*.class  
