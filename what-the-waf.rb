@@ -8,6 +8,8 @@ java_import 'java.awt.BorderLayout'
 java_import 'java.awt.FlowLayout'
 java_import 'java.awt.Container'
 java_import 'javax.swing.JTable'
+java_import 'javax.swing.table.DefaultTableModel'
+java_import 'javax.swing.DefaultListModel'
 java_import 'javax.swing.JPanel'
 java_import 'javax.swing.JTabbedPane'
 java_import 'javax.swing.JButton'
@@ -21,6 +23,7 @@ java_import 'javax.swing.JTextField'
 java_import 'javax.swing.JTextArea'
 java_import 'javax.swing.JLabel'
 java_import 'javax.swing.JFileChooser'
+java_import 'javax.swing.filechooser.FileFilter'
 java_import 'javax.swing.JList'
 java_import 'javax.swing.JSplitPane'
 java_import 'javax.swing.JScrollPane'
@@ -44,12 +47,31 @@ java_import 'burp.IHttpRequestResponse'
 java_import 'burp.IHttpService'
 java_import 'burp.IExtensionHelpers'
 java_import 'burp.ITab'
+java_import 'burp.IMenuItemHandler'
+
+class WordlistFilter < FileFilter
+  
+  def getDescription
+    "Line-seperated wordlist file (*.lst, *.txt)"
+  end
+  
+  def accept(_f)
+    # JOptionPane.showMessageDialog(nil, _f)
+    return true if not File.file?(_f.to_s)
+    return true if File.extname(_f.to_s).downcase == ".txt"
+    return true if File.extname(_f.to_s).downcase == ".lst"
+    false
+  end
+end
 
 class BurpExtender
-  include IBurpExtender, IHttpService, IHttpListener, IHttpRequestResponse, IExtensionHelpers, ITab
+  include IBurpExtender, IExtensionHelpers
+  include IHttpService, IHttpListener, IHttpRequestResponse
+  include ITab, IMenuItemHandler
 
   def registerExtenderCallbacks(_burp)
-    
+    @started = false
+        
     # init
     @burp = _burp
     @burp.setExtensionName("What the WAF?!")
@@ -61,9 +83,13 @@ class BurpExtender
     
     initTargetUI
     initResultUI
+    initPayloads
 
     @burp.customizeUiComponent(@tabs)
     @burp.addSuiteTab(self)
+    
+    # # menu
+    @burp.registerMenuItem("Send to what-the-waf", self)
   end
 
   def getTabCaption
@@ -87,7 +113,7 @@ class BurpExtender
     container.add(scroll, BorderLayout::CENTER)
     
     # # START BTN # #
-    @btn_start = JButton.new("<html><h1>Start<h1><html>")
+    @btn_start = JButton.new("<html><h1><font color='green'>Start</font><h1><html>")
     
     # # INFO PANEL # #
     @pan_info = JPanel.new()
@@ -97,8 +123,7 @@ class BurpExtender
     @pan_info.setLayout(@lay_info)
     # @txt_url.setBorder(BorderFactory.createLineBorder(Color.black, 1, true))
     lbl_req = JLabel.new("Baseline Request")
-    @txt_req = JTextArea.new("GET / HTTP/1.1\nHost: waf.test.com\nUser-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:18.0) Gecko/20100101 Firefox/18.0\nAccept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\nAccept-Language: en\nUS,en;q=0.5\nAccept-Encoding: gzip, deflate\nCookie: foobar=blahblah\nConnection: keep-alive\nCache-Control: max-age=0"
-    )
+    @txt_req = JTextArea.new("Inside burp right-click on a http request and select 'send to what-the-waf'")
     @txt_req_scr = JScrollPane.new(@txt_req)
     lbl_param = JLabel.new("Parameter")
     @txt_param = JTextField.new("wtwtest")
@@ -210,9 +235,10 @@ class BurpExtender
     @pan_pay.setLayout(@lay_pay)
     @pan_pay.setBorder(BorderFactory.createMatteBorder(0,0,2,0, Color.orange))
     lbl_pay = JLabel.new("<html><h3>Payload Options</h3></html>")
-    lbl_sel = JLabel.new("<html><b>Wordlist</b><br><i>Note: Selected wordlist files will be reloaded, each time you hit the \"Start\" button.\"</i></html>")
-    lst_pay = JList.new()
-    lst_pay_scr = JScrollPane.new(lst_pay)
+    lbl_sel = JLabel.new("<html><b>Wordlist</b><br><i>Note: Selected wordlist files will be reloaded, each time you hit the \"Start\" button.\"<br>Multi-selection was enabled</i></html>")
+    @lst_pay_model = DefaultListModel.new()
+    @lst_pay = JList.new(@lst_pay_model)
+    @lst_pay_scr = JScrollPane.new(@lst_pay)
     lbl_pay_add = JLabel.new("<html><i>Add new wordlist (line-seperated list of paylaods)</i></html>")
     @btn_pay_add = JButton.new("Add")
     lbl_cont = JLabel.new("<html><br><b>Payload Factory</b></html>")
@@ -222,7 +248,7 @@ class BurpExtender
     @txt_max_pay_size = JTextField.new("256")
     lbl_pay_size_info = JLabel.new("<html><i>Maximum and Minimum payload size can be equivalent.<br></i></html>")
     lbl_pay_pat = JLabel.new("Pattern")
-    @txt_pay_pat = JTextField.new()
+    @txt_pay_pat = JTextField.new("%20")
     lbl_pay_pat_info = JLabel.new("<html><i>If the payload length be less than the \"Minimum payload size\", this pattern will be used to increase the size of payload.<br></i></html>")
     lbl_pat_grp = JLabel.new("<html><br><b>Prefix/Suffix</b></html>")
     @rdo_pat_left = JRadioButton.new("Treat the pattern as prefix")
@@ -237,7 +263,7 @@ class BurpExtender
       @lay_pay.createParallelGroup(GroupLayout::Alignment::LEADING
         ).addComponent(lbl_pay
         ).addComponent(lbl_sel
-        ).addComponent(lst_pay_scr, 200, 300, 300
+        ).addComponent(@lst_pay_scr, 200, 300, 300
         ).addComponent(lbl_pay_add
         ).addComponent(@btn_pay_add
         ).addComponent(lbl_cont
@@ -262,7 +288,7 @@ class BurpExtender
       @lay_pay.createSequentialGroup(
         ).addComponent(lbl_pay
         ).addComponent(lbl_sel
-        ).addComponent(lst_pay_scr, 100, 200, 200
+        ).addComponent(@lst_pay_scr, 100, 200, 200
         ).addComponent(lbl_pay_add
         ).addComponent(@btn_pay_add
         ).addComponent(lbl_cont
@@ -338,7 +364,11 @@ class BurpExtender
     
     # Add Action Listeners
     @btn_start.addActionListener do |e|
-      wtw_start
+      wtwStart
+    end
+    
+    @btn_pay_add.addActionListener do |e|
+      addPayload
     end
   end
 
@@ -356,15 +386,14 @@ class BurpExtender
     container.add(@pan_res, BorderLayout::CENTER)
     
     lbl_passed = JLabel.new("<html><i>Below, is a list of <b>passed</b> payloads.</i></html>")
-    col = java.util.Vector.new
-    col.add("id")
-    col.add("wordlist")
-    col.add("payload")
-    row = java.util.Vector.new
-    @tbl_res = JTable.new(row, col)
+    @tbl_res_model = DefaultTableModel.new()
+    @tbl_res_model.addColumn("#")
+    @tbl_res_model.addColumn("wordlist")
+    @tbl_res_model.addColumn("payload")
+    @tbl_res = JTable.new(@tbl_res_model)
     scroll_tbl = JScrollPane.new(@tbl_res)
     @tbl_res.setFillsViewportHeight(true);
-    @tbl_res.getColumnModel().getColumn(0).setPreferredWidth(60)
+    @tbl_res.getColumnModel().getColumn(0).setPreferredWidth(50)
     @tbl_res.getColumnModel().getColumn(1).setPreferredWidth(300)
     @tbl_res.getColumnModel().getColumn(2).setPreferredWidth(900)
     @tbl_res.setAutoResizeMode(JTable::AUTO_RESIZE_OFF)
@@ -382,7 +411,41 @@ class BurpExtender
     )
   end
   
-  def wtw_start
-    JOptionPane.showMessageDialog(nil, "Holly shit!");
+  def initPayloads
+    paydir = File.expand_path(File.dirname(__FILE__)) + "/payloads/"
+    # JOptionPane.showMessageDialog(nil, paydir)
+    @wordlist = {}
+    Dir.glob(paydir+ "*.lst") do |p|
+      #JOptionPane.showMessageDialog(nil, p)
+      #if File.extname(p) == ".lst" then
+        @wordlist[File.basename(p, ".*")] = p
+        @lst_pay_model.addElement(File.basename(p, ".*"))
+      #end
+    end
+  end
+  
+  def addPayload
+    fc = JFileChooser.new()
+    fc.setFileFilter(WordlistFilter.new())
+    if fc.showOpenDialog(@tabs) == JFileChooser::APPROVE_OPTION then
+      p = fc.getSelectedFile().to_s
+      # TODO: Check for duplicates
+      @wordlist[File.basename(p, ".*")] = p
+      @lst_pay_model.addElement(File.basename(p, ".*"))
+    end
+  end
+  
+  def wtwStart
+    if not @started then
+      @btn_start.setText("<html><h1><font color='red'>Stop</font><h1><html>")
+    else
+      @btn_start.setText("<html><h1><font color='green'>Start</font><h1><html>")
+    end
+    @started = (not @started)
+  end
+  
+  def menuItemClicked(caption, msg_info)
+    JOptionPane.showMessageDialog(nil, msg_info[0].getRequest().to_s)
+    @txt_req.setText(msg_info[0].getRequest().to_s)
   end
 end
