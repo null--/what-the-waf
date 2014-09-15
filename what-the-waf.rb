@@ -1,46 +1,53 @@
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
+# What the WAF?! extension for burp                                                     #
+#                                                                                       #
+# by _null_                                                                             #
+# source code (GPLv3) is available at github: https://github.com/null--/what-the-waf    #
+#                                                                                       #
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
 require 'java'
 
-# JAVA/JAVAX
-java_import 'java.awt.Color'
-java_import 'java.awt.Dimension'
-java_import 'java.awt.event.ActionListener'
-java_import 'java.awt.BorderLayout'
-java_import 'java.awt.FlowLayout'
-java_import 'java.awt.GridLayout'
-java_import 'java.awt.Container'
-java_import 'java.awt.event.MouseAdapter'
-java_import 'javax.swing.JTable'
-java_import 'javax.swing.JPopupMenu'
-java_import 'javax.swing.JMenuItem'
-java_import 'javax.swing.table.DefaultTableModel'
-java_import 'javax.swing.DefaultListModel'
-java_import 'javax.swing.JPanel'
-java_import 'javax.swing.JTabbedPane'
-java_import 'javax.swing.JButton'
-java_import 'javax.swing.JScrollBar'
-java_import 'javax.swing.JOptionPane'
-java_import 'javax.swing.JCheckBox'
-java_import 'javax.swing.JRadioButton'
-java_import 'javax.swing.ButtonGroup'
-java_import 'javax.swing.JTextField'
-java_import 'javax.swing.JTextArea'
-java_import 'javax.swing.JLabel'
-java_import 'javax.swing.JFileChooser'
-java_import 'javax.swing.filechooser.FileFilter'
-java_import 'javax.swing.JList'
-java_import 'javax.swing.ListSelectionModel'
-java_import 'javax.swing.JScrollPane'
-java_import 'javax.swing.Box'
-java_import 'javax.swing.BoxLayout'
-java_import 'javax.swing.SwingConstants'
-java_import 'javax.swing.SwingUtilities'
-java_import 'javax.swing.BorderFactory'
-java_import 'javax.swing.GroupLayout'
-java_import 'javax.swing.border.LineBorder'
-java_import 'javax.swing.border.EmptyBorder'
-java_import 'javax.swing.border.TitledBorder'
+# The long list of JAVA/JAVAX imports!
+java_import java.awt.Color
+java_import java.awt.Dimension
+java_import java.awt.event.ActionListener
+java_import java.awt.BorderLayout
+java_import java.awt.FlowLayout
+java_import java.awt.GridLayout
+java_import java.awt.Container
+java_import java.awt.event.MouseAdapter
+java_import javax.swing.JTable
+java_import javax.swing.JPopupMenu
+java_import javax.swing.JMenuItem
+java_import javax.swing.table.DefaultTableModel
+java_import javax.swing.DefaultListModel
+java_import javax.swing.JPanel
+java_import javax.swing.JTabbedPane
+java_import javax.swing.JButton
+java_import javax.swing.JScrollBar
+java_import javax.swing.JOptionPane
+java_import javax.swing.JCheckBox
+java_import javax.swing.JRadioButton
+java_import javax.swing.ButtonGroup
+java_import javax.swing.JTextField
+java_import javax.swing.JTextArea
+java_import javax.swing.JLabel
+java_import javax.swing.JFileChooser
+java_import javax.swing.filechooser.FileFilter
+java_import javax.swing.JList
+java_import javax.swing.ListSelectionModel
+java_import javax.swing.JScrollPane
+java_import javax.swing.Box
+java_import javax.swing.BoxLayout
+java_import javax.swing.SwingConstants
+java_import javax.swing.SwingUtilities
+java_import javax.swing.BorderFactory
+java_import javax.swing.GroupLayout
+java_import javax.swing.border.LineBorder
+java_import javax.swing.border.EmptyBorder
+java_import javax.swing.border.TitledBorder
 
-# BURP
+# BURP imports
 java_import 'burp.IBurpExtender'
 java_import 'burp.IHttpListener'
 java_import 'burp.IExtensionStateListener'
@@ -55,18 +62,114 @@ java_import 'burp.IIntruderPayloadGeneratorFactory'
 java_import 'burp.IIntruderPayloadProcessor'
 java_import 'burp.IProxyListener'
 
-## TODO: Add scan status to Result page
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
+# -------------------------------- READ ONLY TABLE MODEL ------------------------------ #
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
+class ReadOnlyTableModel < DefaultTableModel
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
+  def isCellEditable(r, c)
+    false
+  end
+end
+
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
+# ------------------- RESULTS TABLE MOUSE RCLICK HANDLER ------------------------------ #
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
+class ResultMouse < MouseAdapter
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
+  attr_accessor :parent
+
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
+  def initialize()
+    super
+    
+    @popup = JPopupMenu.new()
+    @mnu_send_to_rep = JMenuItem.new("Send to repeater")
+    @popup.add( @mnu_send_to_rep )
+  end
+
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
+  def createMenu(_parent)
+    @parent = _parent
+    @mnu_send_to_rep.addActionListener do |e|
+      @parent.popupSendtoRepeater(e)
+    end
+  end
+
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
+  def mousePressed(e)
+  end
+
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
+  def mouseReleased(e)
+    return if @parent.tbl_res.getSelectedRow() < 0
+    
+    if SwingUtilities.isRightMouseButton(e) then
+      @popup.show(e.getComponent(), e.getX(), e.getY())
+    end
+  end
+end
+
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
+# ------------------------------ PAYLOAD GENERATOR ------------------------------------ #
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
+class PayGen
+  include IIntruderPayloadGenerator
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
+  attr_accessor :cur_pos
+  attr_accessor :n_payloads
+  attr_accessor :all_payloads
+  attr_accessor :parent
+
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
+  def initialize(_p, _pp)
+    @parent = _p
+    @all_payloads = _pp
+    @cur_pos = 0
+    @n_payloads = @all_payloads.size
+  end
+
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
+  # boolean IIntruderPayloadGenerator::hasMorePayloads();
+  def hasMorePayloads
+    return (@cur_pos < @n_payloads)
+  end
+
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
+  # byte[] IIntruderPayloadGenerator::getNextPayload(byte[] baseValue);
+  def getNextPayload(baseValue)
+    @cur_pos = @cur_pos + 1
+    return @all_payloads[@cur_pos - 1].to_java_bytes
+  end
+
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
+  # void IIntruderPayloadGenerator::reset();
+  def reset()
+    @cur_pos = 0
+  end
+
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
+  def lastPos
+    @cur_pos - 1
+  end
+end
+
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
+# ------------------------------ EXTENSION CLASS -------------------------------------- #
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
 class BurpExtender
-  include IBurpExtender, IExtensionHelpers, IExtensionStateListener
-  include IHttpService, IHttpListener, IHttpRequestResponse
-  include IIntruderAttack, IIntruderPayloadGenerator, IIntruderPayloadGeneratorFactory, IIntruderPayloadProcessor
-  include ITab, IMenuItemHandler
-  
+  include IBurpExtender, IExtensionStateListener
+  include IHttpListener
+  include IIntruderAttack, IIntruderPayloadGeneratorFactory, IIntruderPayloadProcessor
+  include ITab
+
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
   attr_accessor :tbl_res
   attr_accessor :tbl_res_model
   attr_accessor :all_result
   attr_accessor :all_response
-  
+
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
   def registerExtenderCallbacks(_burp)
     @started = false
     @status = nil
@@ -99,6 +202,7 @@ class BurpExtender
     # loadEmAll
   end
 
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
   def initTargetUI
     container = JPanel.new()
     @tab_tgt = @tabs.addTab("Target", container)
@@ -318,10 +422,11 @@ class BurpExtender
     
     # Add Action Listeners
     @btn_pay_add.addActionListener do |e|
-      addPayload
+      addPayload(e)
     end
   end
 
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
   def initResultUI
     container = JPanel.new()
     @tab_pl  = @tabs.addTab("Result", container)
@@ -331,12 +436,10 @@ class BurpExtender
     @pan_res = JPanel.new()
     @lay_res = GroupLayout.new(@pan_res)
     @pan_res.setLayout(@lay_res)
-    # scroll = JScrollPane.new(@pan_res)
-    # container.add(scroll, BorderLayout::CENTER)
     container.add(@pan_res, BorderLayout::CENTER)
     
-    lbl_passed = JLabel.new("<html><i>Below, is a list of <b>passed</b> payloads.</i></html>")
-    @tbl_res_model = DefaultTableModel.new()
+    lbl_passed = JLabel.new("<html><u>Below, is a list of <b>passed</b> payloads.</u><br><i>You can select a row then press Ctrl+C to copy its content or right-click on it and choose \"Send to repeater\"</i></html>")
+    @tbl_res_model = ReadOnlyTableModel.new()
     @tbl_res_model.addColumn("#")
     @tbl_res_model.addColumn("Wordlist")
     @tbl_res_model.addColumn("Payload")
@@ -350,57 +453,25 @@ class BurpExtender
     @tbl_res.getColumnModel().getColumn(2).setPreferredWidth(300)
     @tbl_res.getColumnModel().getColumn(3).setPreferredWidth(500)
     @tbl_res.setAutoResizeMode(JTable::AUTO_RESIZE_OFF)    
-    @lbl_stat = JLabel.new("Status: Stopped")
     
     @lay_res.setHorizontalGroup(
       @lay_res.createParallelGroup(GroupLayout::Alignment::LEADING
         ).addComponent(lbl_passed
-        ).addComponent(scroll_tbl
-        ).addComponent(@lbl_stat)
+        ).addComponent(scroll_tbl)
     )
     
     @lay_res.setVerticalGroup(
       @lay_res.createSequentialGroup(
         ).addComponent(lbl_passed
-        ).addComponent(scroll_tbl
-        ).addComponent(@lbl_stat)
+        ).addComponent(scroll_tbl)
     )
     
     @mouse_handler = ResultMouse.new
     @mouse_handler.createMenu(self)
     @tbl_res.addMouseListener( @mouse_handler )
   end
-  
-  class ResultMouse < MouseAdapter
-    attr_accessor :parent
-    
-    def initialize()
-      super
-      
-      @popup = JPopupMenu.new()
-      @mnu_send_to_rep = JMenuItem.new("Send to repeater")
-      @popup.add( @mnu_send_to_rep )
-    end
-    
-    def createMenu(_parent)
-      @parent = _parent
-      @mnu_send_to_rep.addActionListener do |e|
-        @parent.popupSendtoRepeater(e)
-      end
-    end
-    
-    def mousePressed(e)
-    end
-    
-    def mouseReleased(e)
-      return if @parent.tbl_res.getSelectedRow() < 0
-      
-      if SwingUtilities.isRightMouseButton(e) then
-        @popup.show(e.getComponent(), e.getX(), e.getY())
-      end
-    end
-  end
-  
+
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
   def popupSendtoRepeater(e)
     row = @tbl_res.getSelectedRow
     # JOptionPane.showMessageDialog(nil, @all_response[row].getHttpService().getHost().to_s + ":" + @all_response[row].getHttpService.getPort.to_s + "\n" + @all_response[row].getRequest().to_s)
@@ -410,13 +481,13 @@ class BurpExtender
       @all_response[row].getHttpService().getPort, 
       @all_response[row].getHttpService().getProtocol() == "https", 
       @all_response[row].getRequest(),
-      ("What the WAF?! #" + row.to_s).to_java_string 
+      ("What the WAF?! #" + (row+1).to_s).to_java_string 
     )
   end
-  
+
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
   def initPayloads
     paydir = File.expand_path(File.dirname(__FILE__)) + "/payloads/"
-    # JOptionPane.showMessageDialog(nil, paydir)
     @wordlist = {}
     Dir.glob(paydir+ "*.lst") do |p|
       #JOptionPane.showMessageDialog(nil, p)
@@ -426,8 +497,9 @@ class BurpExtender
       #end
     end
   end
-  
-  def addPayload
+
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
+  def addPayload(e)
     fc = JFileChooser.new()
     fc.setFileFilter(WordlistFilter.new())
     if fc.showOpenDialog(@tabs) == JFileChooser::APPROVE_OPTION then
@@ -437,10 +509,9 @@ class BurpExtender
       @lst_pay_model.addElement(File.basename(p, ".*"))
     end
   end
-  
+
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
   def loadEmAll
-    # JOptionPane.showMessageDialog(nil, "Loading ...")
-    # @baseline = @txt_req.getText().to_s
     @force_encoding = @chk_encode.isSelected()
     @delay = @txt_delay.getText().to_s.to_i
     @add_prefix = @rdo_pat_left.isSelected()
@@ -469,9 +540,6 @@ class BurpExtender
         next if l.empty?
         @all_payloads[@n_payloads] = l
         @all_wordlists[@n_payloads] = k
-        
-        # JOptionPane.showMessageDialog(nil, l)
-        # @tbl_res_model.addRow([@n_payloads, @all_wordlists[@n_payloads], @all_payloads[@n_payloads]].to_java)
         @n_payloads = @n_payloads + 1
       end
     end
@@ -483,7 +551,6 @@ class BurpExtender
     @chk.each do |c,b|
       @response[c] = @chk[c].isSelected()
     end
-    # JOptionPane.showMessageDialog(nil, "All Done")
     
     @cur_pos = 0
   end
@@ -493,24 +560,29 @@ class BurpExtender
     @tbl_res_model.addRow([@total_index, w, p, r].to_java)
   end
   
-  # ------------------------------ THE BURP PART OF THINGS ------------------------------ #
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
+# -------------------------------------- BURP HOOKS ----------------------------------- #
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
   # String ITab::getTabCaption();
   def getTabCaption
     "What the WAF?!"
   end
-  
+
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
   # String IIntruderPayloadGeneratorFactory::getGeneratorName();
   def getGeneratorName
     "What The WAF?!"
   end
   
-  
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
   # Component ITab::getUiComponent();
   def getUiComponent
     @tabs
   end
 
-  # IIntruderPayloadGenerator IIntruderPayloadGeneratorFactory::createNewInstance(IIntruderAttack attack);
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
+  # IIntruderPayloadGenerator IIntruderPayloadGeneratorFactory::createNewInstance(
+  #   IIntruderAttack attack);
   def createNewInstance(attack)
     @intruder = attack
     loadEmAll
@@ -518,16 +590,20 @@ class BurpExtender
     @pg = PayGen.new(self, @all_payloads)
     return @pg
   end
-  
+
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
   # String IIntruderPayloadProcessor::getProcessorName();
   def getProcessorName
     "What The WAF?!"
   end
-  
-  # public byte[] IIntruderPayloadProcessor::processPayload(byte[] currentPayload, byte[] originalPayload, byte[] baseValue)
+
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
+  # public byte[] IIntruderPayloadProcessor::processPayload(
+  #   byte[] currentPayload,
+  #   byte[] originalPayload, 
+  #   byte[] baseValue)
   def processPayload(currentPayload, originalPayload, baseValue)
-    ## TODO
-    # JOptionPane.showMessageDialog(nil, "Size: " + @pay_size.to_s + ", Pattern:" + @pattern + ", ")
+    ## TODO: Processed payload size does not match the exact @pay_size value
     
     if @force_encoding then
       currentPayload = @helper.urlEncode(currentPayload)
@@ -558,68 +634,30 @@ class BurpExtender
       end
     end
     
-    # JOptionPane.showMessageDialog(nil, "Payload: " + currentPayload.to_s)
     return cs.to_java_bytes
   end
-  
-  # void IHttpListener::processHttpMessage(int toolFlag, boolean messageIsRequest, IHttpRequestResponse messageInfo);
+
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
+  # void IHttpListener::processHttpMessage(
+  #   int toolFlag, 
+  #   boolean messageIsRequest, 
+  #   IHttpRequestResponse messageInfo);
   def processHttpMessage(toolFlag, messageIsRequest, messageInfo)
-    # JOptionPane.showMessageDialog(nil, "RECV")
-    return unless toolFlag == 0x20
+    return unless toolFlag == 0x20 # DUMMY!
     return if messageInfo.getComment().to_s.downcase.include?("baseline")
     
     ## TODO
     if not messageIsRequest and not @pg.nil? then
       # JOptionPane.showMessageDialog(nil, "RECV \n" + messageInfo.getResponse().to_s)
       @all_response[ @total_index ] = messageInfo
-      addResult(@all_wordlists[ @pg.lastPos ], @all_payloads[ @pg.lastPos ], @all_response[ @total_index ].to_s)
+      addResult(@all_wordlists[ @pg.lastPos ], @all_payloads[ @pg.lastPos ], @all_response[ @total_index ].getRequest().to_s)
     end
   end
-  
+
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
   # void extensionUnloaded();
   def extensionUnloaded
     ## TODO
   end
-  
-  class PayGen
-    include IIntruderPayloadGenerator
-    
-    attr_accessor :cur_pos
-    attr_accessor :n_payloads
-    attr_accessor :all_payloads
-    attr_accessor :parent
-    
-    def initialize(_p, _pp)
-      @parent = _p
-      @all_payloads = _pp
-      @cur_pos = 0
-      @n_payloads = @all_payloads.size
-    end
-    
-    # boolean IIntruderPayloadGenerator::hasMorePayloads();
-    def hasMorePayloads
-      ## TODO
-      # JOptionPane.showMessageDialog(nil, @cur_pos.to_s + " / " + @n_payloads.to_s)
-      return (@cur_pos < @n_payloads)
-    end
-    
-    # byte[] IIntruderPayloadGenerator::getNextPayload(byte[] baseValue);
-    def getNextPayload(baseValue)
-      ## TODO
-      @cur_pos = @cur_pos + 1
-      # JOptionPane.showMessageDialog(nil, @all_payloads[@cur_pos] + " {" + @all_payloads.to_s + "} - " + @cur_pos.to_s)
-      return @all_payloads[@cur_pos - 1].to_java_bytes
-    end
-    
-    # void IIntruderPayloadGenerator::reset();
-    def reset()
-      ## TODO
-      # JOptionPane.showMessageDialog(nil, "RESET")
-      @cur_pos = 0
-    end
-    
-    def lastPos
-      @cur_pos - 1
-    end
-  end
 end
+
