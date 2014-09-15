@@ -8,7 +8,10 @@ java_import 'java.awt.BorderLayout'
 java_import 'java.awt.FlowLayout'
 java_import 'java.awt.GridLayout'
 java_import 'java.awt.Container'
+java_import 'java.awt.event.MouseAdapter'
 java_import 'javax.swing.JTable'
+java_import 'javax.swing.JPopupMenu'
+java_import 'javax.swing.JMenuItem'
 java_import 'javax.swing.table.DefaultTableModel'
 java_import 'javax.swing.DefaultListModel'
 java_import 'javax.swing.JPanel'
@@ -25,10 +28,12 @@ java_import 'javax.swing.JLabel'
 java_import 'javax.swing.JFileChooser'
 java_import 'javax.swing.filechooser.FileFilter'
 java_import 'javax.swing.JList'
+java_import 'javax.swing.ListSelectionModel'
 java_import 'javax.swing.JScrollPane'
 java_import 'javax.swing.Box'
 java_import 'javax.swing.BoxLayout'
 java_import 'javax.swing.SwingConstants'
+java_import 'javax.swing.SwingUtilities'
 java_import 'javax.swing.BorderFactory'
 java_import 'javax.swing.GroupLayout'
 java_import 'javax.swing.border.LineBorder'
@@ -38,6 +43,7 @@ java_import 'javax.swing.border.TitledBorder'
 # BURP
 java_import 'burp.IBurpExtender'
 java_import 'burp.IHttpListener'
+java_import 'burp.IExtensionStateListener'
 java_import 'burp.IHttpRequestResponse'
 java_import 'burp.IHttpService'
 java_import 'burp.IExtensionHelpers'
@@ -48,34 +54,35 @@ java_import 'burp.IIntruderPayloadGenerator'
 java_import 'burp.IIntruderPayloadGeneratorFactory'
 java_import 'burp.IIntruderPayloadProcessor'
 java_import 'burp.IProxyListener'
-java_import 'burp.IInterceptedProxyMessage'
 
 ## TODO: Add scan status to Result page
 class BurpExtender
-  include IBurpExtender, IExtensionHelpers
+  include IBurpExtender, IExtensionHelpers, IExtensionStateListener
   include IHttpService, IHttpListener, IHttpRequestResponse
   include IIntruderAttack, IIntruderPayloadGenerator, IIntruderPayloadGeneratorFactory, IIntruderPayloadProcessor
-  include IProxyListener, IInterceptedProxyMessage
   include ITab, IMenuItemHandler
   
+  attr_accessor :tbl_res
+  attr_accessor :tbl_res_model
+  attr_accessor :all_result
+  attr_accessor :all_response
   
   def registerExtenderCallbacks(_burp)
     @started = false
-    @threads = []
-    @n_threads = 0
     @status = nil
-    @x_payloads = []
-    @x_wordlist = []
-    @x_result = []
+    @all_result = []
+    @all_response = []
     @intruder = nil
-        
+    
     # init
     @burp = _burp
     @burp.setExtensionName("What the WAF?!")
-    @helpers = @burp.getHelpers()
+    @helper = @burp.getHelpers()
+    
     @burp.registerIntruderPayloadGeneratorFactory(self)
     @burp.registerIntruderPayloadProcessor(self)
-    @burp.registerProxyListener(self)
+    @burp.registerHttpListener(self)
+    @burp.registerExtensionStateListener(self)
     
     # gui
     # # tabs
@@ -87,6 +94,9 @@ class BurpExtender
 
     @burp.customizeUiComponent(@tabs)
     @burp.addSuiteTab(self)
+    
+    @total_index = 0    
+    # loadEmAll
   end
 
   def initTargetUI
@@ -108,8 +118,8 @@ class BurpExtender
     @lay_info.setAutoCreateContainerGaps(true)
     @pan_info.setLayout(@lay_info)
     @pan_info.setBorder(BorderFactory.createMatteBorder(0,0,2,0, Color.orange))
-    lbl_head = JLabel.new("<html><h3>How to use</h3></html>")
-    lbl_body = JLabel.new("<html><p>1. This extension works beside the Intruder, so send your target request to the Intruder and select your parameters as you always do.<br>2. Under the \"Payloads\" tab select the \"Payload type\" to <b>\"Extension-generated\"</b><br>3. Under the \"Payload Options\" section, click on the \"select generator\" button and choose \"What the WAF?!\".<br>4. Under the \"Payload Processing\" click \"add\" then select <b>\"Invoke Burp Extension\"</b> and choose \"What The WAF?!\" as your processor.<br>5. Start Attack.</p><b>Important Notes:</b><br><p>1. Current version does not support simultaneous attacks.<br>2. Scan one parameter at a time (Sniper mode)</p></html>")
+    lbl_head = JLabel.new("<html><h3>README</h3></html>")
+    lbl_body = JLabel.new("<html><p>1. This extension works beside the Intruder, so send your target request to the Intruder and select your parameters as you always do.<br>2. Under the \"Payloads\" tab select the \"Payload type\" to <b>\"Extension-generated\"</b><br>3. Under the \"Payload Options\" section, click on the \"select generator\" button and choose \"What the WAF?!\".<br>4. Under the \"Payload Processing\" click \"add\" then select <b>\"Invoke Burp Extension\"</b> and choose \"What The WAF?!\" as your processor.<br>5. Start Attack.</p><br><p>Note:<br>1.On the \"Resuls\" tab you can select a row then right-click on it and choose \"Send to repeater\"</p><b>Important Notes:</b><br><p>1. Current version does not support simultaneous attacks.<br>2. Scan one parameter at a time (Sniper mode)</p></html>")
     txt_shit = JTextField.new()
     
     @lay_info.setHorizontalGroup(
@@ -204,18 +214,16 @@ class BurpExtender
     lbl_pay_add = JLabel.new("<html><i>Add new wordlist (line-seperated list of paylaods)</i></html>")
     @btn_pay_add = JButton.new("Add")
     lbl_cont = JLabel.new("<html><br><b>Payload Factory</b></html>")
-    lbl_min_pay_size = JLabel.new("Minimum payload size")
-    @txt_min_pay_size = JTextField.new("0")
-    lbl_max_pay_size = JLabel.new("Maximum payload size")
-    @txt_max_pay_size = JTextField.new("256")
-    lbl_pay_size_info = JLabel.new("<html><i>Maximum and Minimum payload size can be equivalent.<br></i></html>")
+    lbl_pay_size = JLabel.new("Payload size")
+    @txt_pay_size = JTextField.new("512")
+    lbl_pay_size_info = JLabel.new("<html><i>'0' means: Do not add patter<br></i></html>")
     lbl_pay_pat = JLabel.new("Pattern")
     @txt_pay_pat = JTextField.new("%20")
     lbl_pay_pat_info = JLabel.new("<html><i>If the payload length be less than the \"Minimum payload size\", this pattern will be used to increase the size of payload.<br></i></html>")
     lbl_pat_grp = JLabel.new("<html><br><b>Prefix/Suffix</b></html>")
     @rdo_pat_left = JRadioButton.new("Treat the pattern as prefix")
     @rdo_pat_right = JRadioButton.new("Treat the pattern as suffix")
-    @rdo_pat_both = JRadioButton.new("Both!")
+    @rdo_pat_both = JRadioButton.new("Both!", true)
     grp_pat = ButtonGroup.new()
     grp_pat.add(@rdo_pat_left)
     grp_pat.add(@rdo_pat_right)
@@ -230,11 +238,8 @@ class BurpExtender
         ).addComponent(@btn_pay_add
         ).addComponent(lbl_cont
         ).addGroup(@lay_pay.createSequentialGroup(
-          ).addComponent(lbl_min_pay_size
-          ).addComponent(@txt_min_pay_size, 100, 100, 100)
-        ).addGroup(@lay_pay.createSequentialGroup(
-          ).addComponent(lbl_max_pay_size
-          ).addComponent(@txt_max_pay_size, 100, 100, 100)
+          ).addComponent(lbl_pay_size
+          ).addComponent(@txt_pay_size, 100, 100, 100)
         ).addComponent(lbl_pay_size_info
         ).addGroup(@lay_pay.createSequentialGroup(
           ).addComponent(lbl_pay_pat
@@ -255,11 +260,8 @@ class BurpExtender
         ).addComponent(@btn_pay_add
         ).addComponent(lbl_cont
         ).addGroup(@lay_pay.createParallelGroup(GroupLayout::Alignment::BASELINE
-          ).addComponent(lbl_min_pay_size
-          ).addComponent(@txt_min_pay_size)
-        ).addGroup(@lay_pay.createParallelGroup(GroupLayout::Alignment::BASELINE
-          ).addComponent(lbl_max_pay_size
-          ).addComponent(@txt_max_pay_size)
+          ).addComponent(lbl_pay_size
+          ).addComponent(@txt_pay_size)
         ).addComponent(lbl_pay_size_info
         ).addGroup(@lay_pay.createParallelGroup(GroupLayout::Alignment::BASELINE
           ).addComponent(lbl_pay_pat
@@ -279,24 +281,13 @@ class BurpExtender
     @pan_scan.setLayout(@lay_scan)
     @pan_scan.setBorder(BorderFactory.createMatteBorder(0,0,2,0, Color.orange))
     lbl_scan = JLabel.new("<html><h3>Scan Options</h3></html>")
-    @chk_encode = JCheckBox.new("Force url encoding")
-    lbl_scan_ses = JLabel.new("<html><b>Session Settings</b></html>")
-    lbl_delay = JLabel.new("Delay")
+    @chk_encode = JCheckBox.new("Force url encoding", true)
     lbl_scan_cont = JLabel.new("<html><br><b>Content Settings</b></html>")
     @txt_delay = JTextField.new("0")
-    lbl_threads = JLabel.new("Threads")
-    @txt_threads = JTextField.new("4")
     
     @lay_scan.setHorizontalGroup(
       @lay_scan.createParallelGroup(GroupLayout::Alignment::LEADING
         ).addComponent(lbl_scan
-        ).addComponent(lbl_scan_ses
-        ).addGroup(@lay_scan.createSequentialGroup(
-          ).addComponent(lbl_delay
-          ).addComponent(@txt_delay, 100, 100, 100)
-        ).addGroup(@lay_scan.createSequentialGroup(
-          ).addComponent(lbl_threads
-          ).addComponent(@txt_threads, 100, 100, 100)
         ).addComponent(lbl_scan_cont
         ).addComponent(@chk_encode)
     )
@@ -304,13 +295,6 @@ class BurpExtender
     @lay_scan.setVerticalGroup(
       @lay_scan.createSequentialGroup(
         ).addComponent(lbl_scan
-        ).addComponent(lbl_scan_ses
-        ).addGroup(@lay_scan.createParallelGroup(GroupLayout::Alignment::BASELINE
-          ).addComponent(lbl_delay
-          ).addComponent(@txt_delay)
-        ).addGroup(@lay_scan.createParallelGroup(GroupLayout::Alignment::BASELINE
-          ).addComponent(lbl_threads
-          ).addComponent(@txt_threads)
         ).addComponent(lbl_scan_cont
         ).addComponent(@chk_encode)
     )
@@ -354,14 +338,17 @@ class BurpExtender
     lbl_passed = JLabel.new("<html><i>Below, is a list of <b>passed</b> payloads.</i></html>")
     @tbl_res_model = DefaultTableModel.new()
     @tbl_res_model.addColumn("#")
-    @tbl_res_model.addColumn("wordlist")
-    @tbl_res_model.addColumn("payload")
+    @tbl_res_model.addColumn("Wordlist")
+    @tbl_res_model.addColumn("Payload")
+    @tbl_res_model.addColumn("HTTP Request")
     @tbl_res = JTable.new(@tbl_res_model)
     scroll_tbl = JScrollPane.new(@tbl_res)
     @tbl_res.setFillsViewportHeight(true);
+    @tbl_res.setSelectionMode(ListSelectionModel::SINGLE_SELECTION)
     @tbl_res.getColumnModel().getColumn(0).setPreferredWidth(50)
-    @tbl_res.getColumnModel().getColumn(1).setPreferredWidth(300)
-    @tbl_res.getColumnModel().getColumn(2).setPreferredWidth(900)
+    @tbl_res.getColumnModel().getColumn(1).setPreferredWidth(100)
+    @tbl_res.getColumnModel().getColumn(2).setPreferredWidth(300)
+    @tbl_res.getColumnModel().getColumn(3).setPreferredWidth(500)
     @tbl_res.setAutoResizeMode(JTable::AUTO_RESIZE_OFF)    
     @lbl_stat = JLabel.new("Status: Stopped")
     
@@ -377,6 +364,53 @@ class BurpExtender
         ).addComponent(lbl_passed
         ).addComponent(scroll_tbl
         ).addComponent(@lbl_stat)
+    )
+    
+    @mouse_handler = ResultMouse.new
+    @mouse_handler.createMenu(self)
+    @tbl_res.addMouseListener( @mouse_handler )
+  end
+  
+  class ResultMouse < MouseAdapter
+    attr_accessor :parent
+    
+    def initialize()
+      super
+      
+      @popup = JPopupMenu.new()
+      @mnu_send_to_rep = JMenuItem.new("Send to repeater")
+      @popup.add( @mnu_send_to_rep )
+    end
+    
+    def createMenu(_parent)
+      @parent = _parent
+      @mnu_send_to_rep.addActionListener do |e|
+        @parent.popupSendtoRepeater(e)
+      end
+    end
+    
+    def mousePressed(e)
+    end
+    
+    def mouseReleased(e)
+      return if @parent.tbl_res.getSelectedRow() < 0
+      
+      if SwingUtilities.isRightMouseButton(e) then
+        @popup.show(e.getComponent(), e.getX(), e.getY())
+      end
+    end
+  end
+  
+  def popupSendtoRepeater(e)
+    row = @tbl_res.getSelectedRow
+    # JOptionPane.showMessageDialog(nil, @all_response[row].getHttpService().getHost().to_s + ":" + @all_response[row].getHttpService.getPort.to_s + "\n" + @all_response[row].getRequest().to_s)
+    
+    @burp.sendToRepeater(
+      @all_response[row].getHttpService().getHost, 
+      @all_response[row].getHttpService().getPort, 
+      @all_response[row].getHttpService().getProtocol() == "https", 
+      @all_response[row].getRequest(),
+      ("What the WAF?! #" + row.to_s).to_java_string 
     )
   end
   
@@ -406,16 +440,18 @@ class BurpExtender
   
   def loadEmAll
     # JOptionPane.showMessageDialog(nil, "Loading ...")
-    @n_threads = @txt_threads.getText().to_s.to_i
     # @baseline = @txt_req.getText().to_s
     @force_encoding = @chk_encode.isSelected()
     @delay = @txt_delay.getText().to_s.to_i
     @add_prefix = @rdo_pat_left.isSelected()
     @add_suffix = @rdo_pat_right.isSelected()
     @add_both = @rdo_pat_both.isSelected()
+    if @add_both then
+      @add_prefix = true
+      @add_suffix = true
+    end
     @pattern = @txt_pay_pat.getText()
-    @max_size = @txt_max_pay_size.getText().to_s.to_i
-    @min_size = @txt_min_pay_size.getText().to_s.to_i
+    @pay_size = @txt_pay_size.getText().to_s.to_i
     
     # JOptionPane.showMessageDialog(nil, "Half Done ...")
     @all_payloads = []
@@ -423,9 +459,10 @@ class BurpExtender
     @n_payloads = 0
     
     @tbl_res_model.setRowCount(0)
-    cell = @lst_pay.getSelectedValues()
+    # cell = @lst_pay.getSelectedValues()
     @wordlist.each do |k,v|
-      next unless cell.
+      ## TODO: Multi selection
+      # next unless cell.find(k)
       # JOptionPane.showMessageDialog(nil, k + " - " + v)
       File.open(v).each do |l|
         l = l.chomp
@@ -438,6 +475,7 @@ class BurpExtender
         @n_payloads = @n_payloads + 1
       end
     end
+    @all_result = Array.new(@n_payloads, false)
     
     @timeout = @txt_timeout.getText().to_s.to_i
     @block_page = @txt_block_url.getText().to_s.to_i
@@ -445,25 +483,20 @@ class BurpExtender
     @chk.each do |c,b|
       @response[c] = @chk[c].isSelected()
     end
-    @param = @txt_param.getText
     # JOptionPane.showMessageDialog(nil, "All Done")
+    
+    @cur_pos = 0
+  end
+  
+  def addResult(w, p, r)
+    @total_index = @total_index + 1
+    @tbl_res_model.addRow([@total_index, w, p, r].to_java)
   end
   
   # ------------------------------ THE BURP PART OF THINGS ------------------------------ #
   # String ITab::getTabCaption();
   def getTabCaption
-    return "What the WAF?!"
-  end
-  
-  # Component ITab::getUiComponent();
-  def getUiComponent
-    return @tabs
-  end
-
-  # IIntruderPayloadGenerator IIntruderPayloadGeneratorFactory::createNewInstance(IIntruderAttack attack);
-  def createNewInstance(attack)
-    @intruder = attack
-    self
+    "What the WAF?!"
   end
   
   # String IIntruderPayloadGeneratorFactory::getGeneratorName();
@@ -471,21 +504,19 @@ class BurpExtender
     "What The WAF?!"
   end
   
-  # boolean IIntruderPayloadGenerator::hasMorePayloads();
-  def hasMorePayloads
-    ## TODO
-    false
-  end
   
-  # byte[] IIntruderPayloadGenerator::getNextPayload(byte[] baseValue);
-  def getNextPayload(baseValue)
-    ## TODO
-    nil
+  # Component ITab::getUiComponent();
+  def getUiComponent
+    @tabs
   end
-  
-  # void IIntruderPayloadGenerator::reset();
-  def reset()
-    ## TODO
+
+  # IIntruderPayloadGenerator IIntruderPayloadGeneratorFactory::createNewInstance(IIntruderAttack attack);
+  def createNewInstance(attack)
+    @intruder = attack
+    loadEmAll
+    # JOptionPane.showMessageDialog(nil, "New instance")
+    @pg = PayGen.new(self, @all_payloads)
+    return @pg
   end
   
   # String IIntruderPayloadProcessor::getProcessorName();
@@ -496,11 +527,99 @@ class BurpExtender
   # public byte[] IIntruderPayloadProcessor::processPayload(byte[] currentPayload, byte[] originalPayload, byte[] baseValue)
   def processPayload(currentPayload, originalPayload, baseValue)
     ## TODO
-    nil
+    # JOptionPane.showMessageDialog(nil, "Size: " + @pay_size.to_s + ", Pattern:" + @pattern + ", ")
+    
+    if @force_encoding then
+      currentPayload = @helper.urlEncode(currentPayload)
+    end
+    
+    cs = currentPayload.to_s
+    if @pay_size > 0 and @pattern != "" then
+      if cs.size > @pay_size then
+        cs = cs[0..@pay_size]
+      else
+        ps = @pattern.size
+        
+        rem = @pay_size - cs.size
+        lrem = rrem = rem
+        if @add_both then
+          lrem = rrem = rem/2
+        end
+        
+        if @add_prefix then
+          q = lrem / ps
+          cs = (@pattern * q) + cs
+        end
+        
+        if @add_suffix then
+          q = rrem / ps
+          cs = cs + (@pattern * q)
+        end
+      end
+    end
+    
+    # JOptionPane.showMessageDialog(nil, "Payload: " + currentPayload.to_s)
+    return cs.to_java_bytes
   end
   
-  #  void IProxyListener::processProxyMessage(boolean messageIsRequest, IInterceptedProxyMessage message);
-  def processProxyMessage(messageIsRequest, message)
+  # void IHttpListener::processHttpMessage(int toolFlag, boolean messageIsRequest, IHttpRequestResponse messageInfo);
+  def processHttpMessage(toolFlag, messageIsRequest, messageInfo)
+    # JOptionPane.showMessageDialog(nil, "RECV")
+    return unless toolFlag == 0x20
+    return if messageInfo.getComment().to_s.downcase.include?("baseline")
+    
     ## TODO
+    if not messageIsRequest and not @pg.nil? then
+      # JOptionPane.showMessageDialog(nil, "RECV \n" + messageInfo.getResponse().to_s)
+      @all_response[ @total_index ] = messageInfo
+      addResult(@all_wordlists[ @pg.lastPos ], @all_payloads[ @pg.lastPos ], @all_response[ @total_index ].to_s)
+    end
+  end
+  
+  # void extensionUnloaded();
+  def extensionUnloaded
+    ## TODO
+  end
+  
+  class PayGen
+    include IIntruderPayloadGenerator
+    
+    attr_accessor :cur_pos
+    attr_accessor :n_payloads
+    attr_accessor :all_payloads
+    attr_accessor :parent
+    
+    def initialize(_p, _pp)
+      @parent = _p
+      @all_payloads = _pp
+      @cur_pos = 0
+      @n_payloads = @all_payloads.size
+    end
+    
+    # boolean IIntruderPayloadGenerator::hasMorePayloads();
+    def hasMorePayloads
+      ## TODO
+      # JOptionPane.showMessageDialog(nil, @cur_pos.to_s + " / " + @n_payloads.to_s)
+      return (@cur_pos < @n_payloads)
+    end
+    
+    # byte[] IIntruderPayloadGenerator::getNextPayload(byte[] baseValue);
+    def getNextPayload(baseValue)
+      ## TODO
+      @cur_pos = @cur_pos + 1
+      # JOptionPane.showMessageDialog(nil, @all_payloads[@cur_pos] + " {" + @all_payloads.to_s + "} - " + @cur_pos.to_s)
+      return @all_payloads[@cur_pos - 1].to_java_bytes
+    end
+    
+    # void IIntruderPayloadGenerator::reset();
+    def reset()
+      ## TODO
+      # JOptionPane.showMessageDialog(nil, "RESET")
+      @cur_pos = 0
+    end
+    
+    def lastPos
+      @cur_pos - 1
+    end
   end
 end
