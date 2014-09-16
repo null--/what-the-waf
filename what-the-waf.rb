@@ -63,6 +63,21 @@ java_import 'burp.IIntruderPayloadGeneratorFactory'
 java_import 'burp.IIntruderPayloadProcessor'
 java_import 'burp.IProxyListener'
 
+class WordlistFilter < FileFilter
+  def accept(f)
+    return true unless File.file?(f.to_s)
+    
+    return true if File.extname(f.to_s) == ".txt"
+    return true if File.extname(f.to_s) == ".lst"
+    
+    return false
+  end
+  
+  def getDescription
+    "Line-seperated Wordlist Files (*.txt or *.lst)"
+  end
+end
+
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
 # --------------------------------- MY TABLE MODEL ------------------------------------ #
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
@@ -393,9 +408,13 @@ end
     lbl_sel = JLabel.new("<html><b>Wordlist</b><br><i>Note: Selected wordlist files will be reloaded, each time you start the attack\"</i></html>")
     @lst_pay_model = DefaultListModel.new()
     @lst_pay = JList.new(@lst_pay_model)
+    @lst_pay.setSelectionMode(ListSelectionModel::SINGLE_SELECTION)
     @lst_pay_scr = JScrollPane.new(@lst_pay)
     lbl_pay_add = JLabel.new("<html><i>Add new wordlist (line-seperated list of paylaods)</i></html>")
     @btn_pay_add = JButton.new("Add")
+    @btn_pay_rem = JButton.new("Remove")
+    @btn_pay_cls = JButton.new("Clear")
+    @btn_pay_def = JButton.new("Default")
     lbl_cont = JLabel.new("<html><br><b>Payload Factory</b></html>")
     lbl_pay_size = JLabel.new("Payload size")
     @txt_pay_size = JTextField.new("0")
@@ -418,7 +437,11 @@ end
         ).addComponent(lbl_sel
         ).addComponent(@lst_pay_scr, 200, 200, 200
         ).addComponent(lbl_pay_add
-        ).addComponent(@btn_pay_add
+        ).addGroup(@lay_pay.createSequentialGroup(
+          ).addComponent(@btn_pay_add
+          ).addComponent(@btn_pay_rem
+          ).addComponent(@btn_pay_cls
+          ).addComponent(@btn_pay_def)
         ).addComponent(lbl_cont
         ).addGroup(@lay_pay.createSequentialGroup(
           ).addComponent(lbl_pay_size
@@ -440,7 +463,11 @@ end
         ).addComponent(lbl_sel
         ).addComponent(@lst_pay_scr, 200, 200, 200
         ).addComponent(lbl_pay_add
-        ).addComponent(@btn_pay_add
+        ).addGroup(@lay_pay.createParallelGroup(GroupLayout::Alignment::BASELINE
+          ).addComponent(@btn_pay_add
+          ).addComponent(@btn_pay_rem
+          ).addComponent(@btn_pay_cls
+          ).addComponent(@btn_pay_def)
         ).addComponent(lbl_cont
         ).addGroup(@lay_pay.createParallelGroup(GroupLayout::Alignment::BASELINE
           ).addComponent(lbl_pay_size
@@ -517,6 +544,15 @@ end
     @btn_pay_add.addActionListener do |e|
       addPayload(e)
     end
+    @btn_pay_rem.addActionListener do |e|
+      removePayload(e)
+    end
+    @btn_pay_cls.addActionListener do |e|
+      clearPayload(e)
+    end
+    @btn_pay_def.addActionListener do |e|
+      initPayloads
+    end
   end
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
@@ -589,6 +625,8 @@ end
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
   def initPayloads
+    clearPayload
+    
     paydir = File.expand_path(File.dirname(__FILE__)) + "/payloads/"
     @wordlist = {}
     Dir.glob(paydir+ "*.lst") do |p|
@@ -604,12 +642,31 @@ end
   def addPayload(e)
     fc = JFileChooser.new()
     fc.setFileFilter(WordlistFilter.new())
+    
     if fc.showOpenDialog(@tabs) == JFileChooser::APPROVE_OPTION then
       p = fc.getSelectedFile().to_s
       # TODO: Check for duplicates
       @wordlist[File.basename(p, ".*")] = p
       @lst_pay_model.addElement(File.basename(p, ".*"))
     end
+  end
+
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
+  def removePayload(e)
+    i = @lst_pay.getSelectedIndex()
+    JOptionPane.showMessageDialog(nil, "rem: " + i.to_s)
+    n = @lst_pay_model.getElementAt(i).to_s
+    JOptionPane.showMessageDialog(nil, n)
+    if (i != -1) and (@wordlist.has_key? n) then
+        @wordlist.delete(n)
+        @lst_pay_model.remove(i)
+    end
+  end
+  
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
+  def clearPayload(e = nil)
+    @wordlist.clear unless @wordlist.nil?
+    @lst_pay_model.removeAllElements() unless @lst_pay_model.nil?
   end
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
