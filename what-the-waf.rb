@@ -68,13 +68,13 @@ class WordlistFilter < FileFilter
     return true unless File.file?(f.to_s)
     
     return true if File.extname(f.to_s) == ".txt"
-    return true if File.extname(f.to_s) == ".lst"
+    return true if File.extname(f.to_s) == ".lsd"
     
     return false
   end
   
   def getDescription
-    "Line-seperated Wordlist Files (*.txt or *.lst)"
+    "Line-seperated Wordlist Files (*.txt or *.lsd)"
   end
 end
 
@@ -491,7 +491,7 @@ end
     @pan_scan.setLayout(@lay_scan)
     @pan_scan.setBorder(BorderFactory.createMatteBorder(0,0,2,0, Color.orange))
     lbl_scan = JLabel.new("<html><h3>Scan Options</h3></html>")
-    @chk_encode = JCheckBox.new("Force url encoding", true)
+    @chk_encode = JCheckBox.new("Apply URL-encoding on payloads", false)
     lbl_scan_cont = JLabel.new("<html><b>Content Settings</b></html>")
     @txt_delay = JTextField.new("0")
     lbl_res_grp = JLabel.new("<html><b>Results</b></html>")
@@ -629,9 +629,9 @@ end
     
     paydir = File.expand_path(File.dirname(__FILE__)) + "/payloads/"
     @wordlist = {}
-    Dir.glob(paydir+ "*.lst") do |p|
+    Dir.glob(paydir+ "*.lsd") do |p|
       #JOptionPane.showMessageDialog(nil, p)
-      #if File.extname(p) == ".lst" then
+      #if File.extname(p) == ".lsd" then
         @wordlist[File.basename(p, ".*")] = p
         @lst_pay_model.addElement(File.basename(p, ".*"))
       #end
@@ -654,9 +654,7 @@ end
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
   def removePayload(e)
     i = @lst_pay.getSelectedIndex()
-    JOptionPane.showMessageDialog(nil, "rem: " + i.to_s)
     n = @lst_pay_model.getElementAt(i).to_s
-    JOptionPane.showMessageDialog(nil, n)
     if (i != -1) and (@wordlist.has_key? n) then
         @wordlist.delete(n)
         @lst_pay_model.remove(i)
