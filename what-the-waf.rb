@@ -20,6 +20,7 @@ java_import javax.swing.JTable
 java_import javax.swing.JPopupMenu
 java_import javax.swing.JMenuItem
 java_import javax.swing.table.DefaultTableModel
+java_import javax.swing.table.DefaultTableCellRenderer
 java_import javax.swing.DefaultListModel
 java_import javax.swing.JPanel
 java_import javax.swing.JTabbedPane
@@ -63,12 +64,41 @@ java_import 'burp.IIntruderPayloadProcessor'
 java_import 'burp.IProxyListener'
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
-# -------------------------------- READ ONLY TABLE MODEL ------------------------------ #
+# --------------------------------- MY TABLE MODEL ------------------------------------ #
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
-class ReadOnlyTableModel < DefaultTableModel
+class MyTableModel < DefaultTableModel
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
   def isCellEditable(r, c)
     false
+  end
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
+  def getColumnClass(col)
+    case col
+    when 1
+      return java.lang.Boolean
+    else
+      return java.lang.String
+    end
+  end
+end
+
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
+# -------------------------------- MY TABLE RENDERER ---------------------------------- #
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
+class MyTableRenderer < DefaultTableCellRenderer
+  def getTableCellRendererComponent(table, value, isSelected, hasFocus, row, col)
+    # c = DefaultTableCellRenderer.instance_method(
+    #   getTableCellRendererComponent).bind(self).call(
+    #     table, value, isSelected, hasFocus, row, col)
+    
+    c = super(table, value, isSelected, hasFocus, row, col)
+    
+    if table.getModel().getValueAt(row, 1) then
+      c.setBackground( Color.new(253,90,100) )
+    else
+      c.setBackground( Color.new(144,253,169) )
+    end
+    return c
   end
 end
 
@@ -138,6 +168,8 @@ class PayGen
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
   # byte[] IIntruderPayloadGenerator::getNextPayload(byte[] baseValue);
   def getNextPayload(baseValue)
+    @parent.all_timestamp[ @cur_pos ] = Time.now.to_i
+    
     @cur_pos = @cur_pos + 1
     return @all_payloads[@cur_pos - 1].to_java_bytes
   end
@@ -168,6 +200,7 @@ class BurpExtender
   attr_accessor :tbl_res_model
   attr_accessor :all_result
   attr_accessor :all_response
+  attr_accessor :all_timestamp
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
   def registerExtenderCallbacks(_burp)
@@ -175,6 +208,7 @@ class BurpExtender
     @status = nil
     @all_result = []
     @all_response = []
+    @all_timestamp = []
     @intruder = nil
     
     # init
@@ -193,6 +227,8 @@ class BurpExtender
     
     initTargetUI
     initResultUI
+    initReadmeUI
+    
     initPayloads
 
     @burp.customizeUiComponent(@tabs)
@@ -203,16 +239,16 @@ class BurpExtender
   end
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
-  def initTargetUI
+  def initReadmeUI
     container = JPanel.new()
-    @tab_tgt = @tabs.addTab("Target", container)
+    @tab_rme = @tabs.addTab("Readme", container)
     
     container.setLayout(BorderLayout.new())
     container.setBorder(EmptyBorder.new( 3, 3, 3, 3 ) )
-    @pan_tgt = JPanel.new()
-    @lay_tgt = GroupLayout.new(@pan_tgt)
-    @pan_tgt.setLayout(@lay_tgt)
-    scroll = JScrollPane.new(@pan_tgt)
+    @pan_rme = JPanel.new()
+    @lay_rme = GroupLayout.new(@pan_rme)
+    @pan_rme.setLayout(@lay_rme)
+    scroll = JScrollPane.new(@pan_rme)
     container.add(scroll, BorderLayout::CENTER)
     
     # # INFO PANEL # #
@@ -222,6 +258,7 @@ class BurpExtender
     @lay_info.setAutoCreateContainerGaps(true)
     @pan_info.setLayout(@lay_info)
     @pan_info.setBorder(BorderFactory.createMatteBorder(0,0,2,0, Color.orange))
+    
     lbl_head = JLabel.new("<html><h3>README</h3></html>")
     lbl_body = JLabel.new("<html><p>1. This extension works beside the Intruder, so send your target request to the Intruder and select your parameters as you always do.<br>2. Under the \"Payloads\" tab select the \"Payload type\" to <b>\"Extension-generated\"</b><br>3. Under the \"Payload Options\" section, click on the \"select generator\" button and choose \"What the WAF?!\".<br>4. Under the \"Payload Processing\" click \"add\" then select <b>\"Invoke Burp Extension\"</b> and choose \"What The WAF?!\" as your processor.<br>5. Start Attack.</p><br><p>Note:<br>1.On the \"Resuls\" tab you can select a row then right-click on it and choose \"Send to repeater\"</p><b>Important Notes:</b><br><p>1. Current version does not support simultaneous attacks.<br>2. Scan one parameter at a time (Sniper mode)</p></html>")
     txt_shit = JTextField.new()
@@ -238,6 +275,30 @@ class BurpExtender
         ).addComponent(lbl_body)
     )
     
+    @lay_rme.setHorizontalGroup(
+      @lay_rme.createParallelGroup(GroupLayout::Alignment::LEADING
+        ).addComponent(@pan_info)
+    )
+    
+    @lay_rme.setVerticalGroup(
+      @lay_rme.createSequentialGroup(
+        ).addComponent(@pan_info)
+    )
+end
+    
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
+  def initTargetUI
+    container = JPanel.new()
+    @tab_tgt = @tabs.addTab("Target", container)
+    
+    container.setLayout(BorderLayout.new())
+    container.setBorder(EmptyBorder.new( 3, 3, 3, 3 ) )
+    @pan_tgt = JPanel.new()
+    @lay_tgt = GroupLayout.new(@pan_tgt)
+    @pan_tgt.setLayout(@lay_tgt)
+    scroll = JScrollPane.new(@pan_tgt)
+    container.add(scroll, BorderLayout::CENTER)
+    
     # # WAF PANEL # #
     @pan_waf = JPanel.new()
     @lay_waf = GroupLayout.new(@pan_waf)
@@ -251,7 +312,7 @@ class BurpExtender
     @chk = {}
     @chk["200"] = JCheckBox.new("<html>200: OK (WAF was configured to show a <i>\"block\" page</i> <b>directly</b>)</html>")
     @chk["301"] = JCheckBox.new("301: Moved Permanently")
-    @chk["302"] = JCheckBox.new("302: Found")
+    @chk["302"] = JCheckBox.new("302: Found", true)
     @chk["400"] = JCheckBox.new("400: Bad Request")
     @chk["401"] = JCheckBox.new("401: Unauthorized")
     @chk["403"] = JCheckBox.new("403: Forbidden")
@@ -265,13 +326,17 @@ class BurpExtender
     @chk.each do |n,c|
       pan_code.add(c)
     end
-    lbl_red = JLabel.new("<html><br><b>WAF Block/Redirection URL</b><br><i>After being detected, Where does WAF redirect you?</i></html>")
-    lbl_block_url = JLabel.new("Block/Redirection URL")
+    lbl_red = JLabel.new("<html><b>WAF Block/Redirection URL</b><br><i>After being detected, Where does WAF redirect you?</i></html>")
+    lbl_block_url = JLabel.new("Block/Redirection URL (the \"Location\" Header Field)")
     @txt_block_url = JTextField.new()
     lbl_timeout = JLabel.new("Block timeout")
     @txt_timeout = JTextField.new()
     lbl_timeout_info = JLabel.new("<html><i>The connection timeout value used by WAF to block a malicious client. (in seconds)</i></html>")
-    
+    lbl_body = JLabel.new("Search inside body (REGEX)")
+    @txt_body = JTextField.new()
+    lbl_len = JLabel.new("Length: ")
+    @txt_len = JTextField.new("0")
+    lbl_len_info = JLabel.new("<html><i>0 means, Ignore response length</i></html>")
     
     @lay_waf.setHorizontalGroup(
       @lay_waf.createParallelGroup(GroupLayout::Alignment::LEADING
@@ -285,7 +350,14 @@ class BurpExtender
         ).addGroup(@lay_waf.createSequentialGroup(
           ).addComponent(lbl_timeout
           ).addComponent(@txt_timeout, 100, 100, 100)
-        ).addComponent(lbl_timeout_info)
+        ).addComponent(lbl_timeout_info
+        ).addGroup(@lay_waf.createSequentialGroup(
+          ).addComponent(lbl_body
+          ).addComponent(@txt_body, 300, 500, 600)
+        ).addGroup(@lay_waf.createSequentialGroup(
+          ).addComponent(lbl_len
+          ).addComponent(@txt_len, 100, 100, 100)
+        ).addComponent(lbl_len_info)
     )
     
     @lay_waf.setVerticalGroup(
@@ -300,7 +372,14 @@ class BurpExtender
         ).addGroup(@lay_waf.createParallelGroup(GroupLayout::Alignment::BASELINE
           ).addComponent(lbl_timeout
           ).addComponent(@txt_timeout)
-        ).addComponent(lbl_timeout_info)
+        ).addComponent(lbl_timeout_info
+        ).addGroup(@lay_waf.createParallelGroup(GroupLayout::Alignment::BASELINE
+          ).addComponent(lbl_body
+          ).addComponent(@txt_body)
+        ).addGroup(@lay_waf.createParallelGroup(GroupLayout::Alignment::BASELINE
+          ).addComponent(lbl_len
+          ).addComponent(@txt_len)
+        ).addComponent(lbl_len_info)
     )
     
     # # PAYLOAD PANEL # #
@@ -311,7 +390,7 @@ class BurpExtender
     @pan_pay.setLayout(@lay_pay)
     @pan_pay.setBorder(BorderFactory.createMatteBorder(0,0,2,0, Color.orange))
     lbl_pay = JLabel.new("<html><h3>Payload Options</h3></html>")
-    lbl_sel = JLabel.new("<html><b>Wordlist</b><br><i>Note: Selected wordlist files will be reloaded, each time you start the attack\"<br>Multi-selection was enabled</i></html>")
+    lbl_sel = JLabel.new("<html><b>Wordlist</b><br><i>Note: Selected wordlist files will be reloaded, each time you start the attack\"</i></html>")
     @lst_pay_model = DefaultListModel.new()
     @lst_pay = JList.new(@lst_pay_model)
     @lst_pay_scr = JScrollPane.new(@lst_pay)
@@ -319,15 +398,15 @@ class BurpExtender
     @btn_pay_add = JButton.new("Add")
     lbl_cont = JLabel.new("<html><br><b>Payload Factory</b></html>")
     lbl_pay_size = JLabel.new("Payload size")
-    @txt_pay_size = JTextField.new("512")
-    lbl_pay_size_info = JLabel.new("<html><i>'0' means: Do not add patter<br></i></html>")
+    @txt_pay_size = JTextField.new("0")
+    lbl_pay_size_info = JLabel.new("<html><i>'0' means: Do not add pattern<br></i></html>")
     lbl_pay_pat = JLabel.new("Pattern")
-    @txt_pay_pat = JTextField.new("%20")
+    @txt_pay_pat = JTextField.new("")
     lbl_pay_pat_info = JLabel.new("<html><i>If the payload length be less than the \"Minimum payload size\", this pattern will be used to increase the size of payload.<br></i></html>")
     lbl_pat_grp = JLabel.new("<html><br><b>Prefix/Suffix</b></html>")
     @rdo_pat_left = JRadioButton.new("Treat the pattern as prefix")
-    @rdo_pat_right = JRadioButton.new("Treat the pattern as suffix")
-    @rdo_pat_both = JRadioButton.new("Both!", true)
+    @rdo_pat_right = JRadioButton.new("Treat the pattern as suffix", true)
+    @rdo_pat_both = JRadioButton.new("Both!")
     grp_pat = ButtonGroup.new()
     grp_pat.add(@rdo_pat_left)
     grp_pat.add(@rdo_pat_right)
@@ -337,7 +416,7 @@ class BurpExtender
       @lay_pay.createParallelGroup(GroupLayout::Alignment::LEADING
         ).addComponent(lbl_pay
         ).addComponent(lbl_sel
-        ).addComponent(@lst_pay_scr, 200, 300, 300
+        ).addComponent(@lst_pay_scr, 200, 200, 200
         ).addComponent(lbl_pay_add
         ).addComponent(@btn_pay_add
         ).addComponent(lbl_cont
@@ -359,7 +438,7 @@ class BurpExtender
       @lay_pay.createSequentialGroup(
         ).addComponent(lbl_pay
         ).addComponent(lbl_sel
-        ).addComponent(@lst_pay_scr, 100, 200, 200
+        ).addComponent(@lst_pay_scr, 200, 200, 200
         ).addComponent(lbl_pay_add
         ).addComponent(@btn_pay_add
         ).addComponent(lbl_cont
@@ -386,27 +465,42 @@ class BurpExtender
     @pan_scan.setBorder(BorderFactory.createMatteBorder(0,0,2,0, Color.orange))
     lbl_scan = JLabel.new("<html><h3>Scan Options</h3></html>")
     @chk_encode = JCheckBox.new("Force url encoding", true)
-    lbl_scan_cont = JLabel.new("<html><br><b>Content Settings</b></html>")
+    lbl_scan_cont = JLabel.new("<html><b>Content Settings</b></html>")
     @txt_delay = JTextField.new("0")
+    lbl_res_grp = JLabel.new("<html><b>Results</b></html>")
+    @rdo_blocked = JRadioButton.new("Show blocked requests")
+    @rdo_passed = JRadioButton.new("Show passed requests")
+    @rdo_all = JRadioButton.new("Show all (verbose)", true)
+    grp_res = ButtonGroup.new()
+    grp_res.add(@rdo_blocked)
+    grp_res.add(@rdo_passed)
+    grp_res.add(@rdo_all)
     
     @lay_scan.setHorizontalGroup(
       @lay_scan.createParallelGroup(GroupLayout::Alignment::LEADING
         ).addComponent(lbl_scan
         ).addComponent(lbl_scan_cont
-        ).addComponent(@chk_encode)
+        ).addComponent(@chk_encode
+        ).addComponent(lbl_res_grp
+        ).addComponent(@rdo_passed
+        ).addComponent(@rdo_blocked
+        ).addComponent(@rdo_all)
     )
     
     @lay_scan.setVerticalGroup(
       @lay_scan.createSequentialGroup(
         ).addComponent(lbl_scan
         ).addComponent(lbl_scan_cont
-        ).addComponent(@chk_encode)
+        ).addComponent(@chk_encode
+        ).addComponent(lbl_res_grp
+        ).addComponent(@rdo_passed
+        ).addComponent(@rdo_blocked
+        ).addComponent(@rdo_all)
     )
     
     # Finalize layout
     @lay_tgt.setHorizontalGroup(
       @lay_tgt.createParallelGroup(GroupLayout::Alignment::LEADING
-        ).addComponent(@pan_info
         ).addComponent(@pan_waf
         ).addComponent(@pan_pay
         ).addComponent(@pan_scan)
@@ -414,7 +508,6 @@ class BurpExtender
     
     @lay_tgt.setVerticalGroup(
       @lay_tgt.createSequentialGroup(
-        ).addComponent(@pan_info
         ).addComponent(@pan_waf
         ).addComponent(@pan_pay
         ).addComponent(@pan_scan)
@@ -438,21 +531,30 @@ class BurpExtender
     @pan_res.setLayout(@lay_res)
     container.add(@pan_res, BorderLayout::CENTER)
     
-    lbl_passed = JLabel.new("<html><u>Below, is a list of <b>passed</b> payloads.</u><br><i>You can select a row then press Ctrl+C to copy its content or right-click on it and choose \"Send to repeater\"</i></html>")
-    @tbl_res_model = ReadOnlyTableModel.new()
+    lbl_passed = JLabel.new("<html><i>You can select a row then press Ctrl+C to copy its content or right-click on it and choose \"Send to repeater\"</i></html>")
+    @tbl_res_model = MyTableModel.new()
     @tbl_res_model.addColumn("#")
+    @tbl_res_model.addColumn("Blocked")
     @tbl_res_model.addColumn("Wordlist")
     @tbl_res_model.addColumn("Payload")
     @tbl_res_model.addColumn("HTTP Request")
+    @tbl_res_model.addColumn("WTW Comment")
     @tbl_res = JTable.new(@tbl_res_model)
-    scroll_tbl = JScrollPane.new(@tbl_res)
+    
+    @tbl_res.setDefaultRenderer(java.lang.String, MyTableRenderer.new())
+    # @tbl_res.setDefaultRenderer(java.lang.Boolean, MyTableRenderer.new())
+    
     @tbl_res.setFillsViewportHeight(true);
     @tbl_res.setSelectionMode(ListSelectionModel::SINGLE_SELECTION)
     @tbl_res.getColumnModel().getColumn(0).setPreferredWidth(50)
+    @tbl_res.getColumnModel().getColumn(1).setPreferredWidth(20)
     @tbl_res.getColumnModel().getColumn(1).setPreferredWidth(100)
     @tbl_res.getColumnModel().getColumn(2).setPreferredWidth(300)
-    @tbl_res.getColumnModel().getColumn(3).setPreferredWidth(500)
+    @tbl_res.getColumnModel().getColumn(3).setPreferredWidth(300)
+    @tbl_res.getColumnModel().getColumn(4).setPreferredWidth(500)
     @tbl_res.setAutoResizeMode(JTable::AUTO_RESIZE_OFF)    
+    
+    scroll_tbl = JScrollPane.new(@tbl_res)
     
     @lay_res.setHorizontalGroup(
       @lay_res.createParallelGroup(GroupLayout::Alignment::LEADING
@@ -546,18 +648,24 @@ class BurpExtender
     @all_result = Array.new(@n_payloads, false)
     
     @timeout = @txt_timeout.getText().to_s.to_i
-    @block_page = @txt_block_url.getText().to_s.to_i
+    @block_page = @txt_block_url.getText().to_s
+    @regex_str = @txt_body.getText().to_s
+    @regex = Regexp.new @regex_str
+    @reslen = @txt_len.getText().to_s.to_i
+    
     @response = {}
     @chk.each do |c,b|
       @response[c] = @chk[c].isSelected()
     end
     
+    @res_blocked = (@rdo_blocked.isSelected() or @rdo_all.isSelected())
+    @res_passed = (@rdo_passed.isSelected() or @rdo_all.isSelected())
     @cur_pos = 0
   end
   
-  def addResult(w, p, r)
+  def addResult(w, d, p, r, c)
     @total_index = @total_index + 1
-    @tbl_res_model.addRow([@total_index, w, p, r].to_java)
+    @tbl_res_model.addRow([@total_index, d, w, p, r, c].to_java)    
   end
   
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
@@ -646,11 +754,102 @@ class BurpExtender
     return unless toolFlag == 0x20 # DUMMY!
     return if messageInfo.getComment().to_s.downcase.include?("baseline")
     
+    # JOptionPane.showMessageDialog(nil, "RECV \n" + messageInfo.getResponse().to_s)
     ## TODO
     if not messageIsRequest and not @pg.nil? then
       # JOptionPane.showMessageDialog(nil, "RECV \n" + messageInfo.getResponse().to_s)
       @all_response[ @total_index ] = messageInfo
-      addResult(@all_wordlists[ @pg.lastPos ], @all_payloads[ @pg.lastPos ], @all_response[ @total_index ].getRequest().to_s)
+      ri = @helper.analyzeResponse( messageInfo.getResponse() )
+      
+      comment = ""
+      
+      # Check WAF
+      use_code = false
+      code_mathed = false
+      use_time = (@timeout > 0)
+      time_matched = false
+      use_redir = (@block_page.size > 0)
+      redir_matched = false
+      use_regex = (@regex_str.size > 0)
+      regex_matched = false
+      use_reslen = (@reslen > 0)
+      reslen_matched = false
+      
+      # # Check HTTP status code
+      @chk.each do |n,c|
+        if c.isSelected() then
+          use_code = true
+          if n.to_i == ri.getStatusCode().to_i then
+            code_mathed = true
+            break
+          end
+        end
+      end
+      
+      # # Check Block URL
+      if use_redir then
+        JOptionPane.showMessageDialog(nil, "Size: " + @block_page.size.to_s + ", Value: " + @block_page)
+        ri.getHeaders().each do |h|
+          next if h.nil?
+          
+          # JOptionPane.showMessageDialog(nil, h.to_s)
+          if h.to_s.size > 0 and 
+             h.to_s.downcase.include? "location" and 
+             h.to_s.downcase.include? @block_page.downcase 
+          then
+            redir_matched = true
+          end
+        end
+      end
+      
+      # # Check timeout
+      if use_time then
+        diff = Time.now.to_i - @all_timestamp[@pg.lastPos]
+        if diff > @timeout then
+          time_matched = true
+        end
+      end
+      
+      # # Regex
+      if use_regex then
+        body = messageInfo.getResponse().to_s
+        
+        regex_matched = ( not @regex.match( body ).nil? )
+      end
+      
+      # # Response Length
+      if use_reslen then
+        if @reslen == messageInfo.getResponse().size then
+          reslen_matched = true
+        end
+      end
+      
+      # # Final Check
+      detected = 
+         ((use_code and code_mathed) or not use_code) and 
+         ((use_time and time_matched) or not use_time) and 
+         ((use_redir and redir_matched) or not use_redir) and
+         ((use_regex and regex_matched) or not use_regex) and
+         ((use_reslen and reslen_matched) or not use_reslen) 
+      
+      comment = comment + 
+        ", DB: " + detected.to_s + 
+        ", CM: " + code_mathed.to_s + 
+        ", TM: " + time_matched.to_s + 
+        ", BM: " + redir_matched.to_s +
+        ", XM: " + regex_matched.to_s +
+        ", LM: " + reslen_matched.to_s
+      
+      # if (detected and @res_blocked) or (not detected and @res_passed)
+      # then
+        addResult(
+          @all_wordlists[ @pg.lastPos ],
+          detected,
+          @all_payloads[ @pg.lastPos ], 
+          @all_response[ @total_index ].getRequest().to_s,
+          comment
+        )
+      # end
     end
   end
 
