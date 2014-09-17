@@ -211,7 +211,7 @@ class PayGen
   # void IIntruderPayloadGenerator::reset();
   def reset
     @cur_pos = 0
-    # @parent.loadEmAll
+    @parent.loadEmAll
     
     @all_payloads = @parent.all_payloads
     @n_payloads = @all_payloads.size
@@ -228,7 +228,7 @@ class PayGen
   
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
   def allowNext
-    @parent.stdout.println("Allowing " + (@cur_pos+1).to_s)
+    # @parent.stdout.println("Allowing " + (@cur_pos+1).to_s)
     @allow[@cur_pos] = true
   end
 end
@@ -389,12 +389,12 @@ end
     @txt_block_url = JTextField.new()
     lbl_timeout = JLabel.new("Block timeout")
     @txt_timeout = JTextField.new()
-    lbl_timeout_info = JLabel.new("<html><i>The connection timeout value used by WAF to block a malicious client. (in seconds)</i></html>")
+    lbl_timeout_info = JLabel.new("<html><i>The connection timeout value used by WAF to block a malicious client. (in seconds)</i><b>EXPERIMENTAL</b></html>")
     lbl_body = JLabel.new("Search inside body (REGEX)")
     @txt_body = JTextField.new()
     lbl_len = JLabel.new("Length: ")
     @txt_len = JTextField.new("0")
-    lbl_len_info = JLabel.new("<html><i>0 means, Ignore response length</i></html>")
+    lbl_len_info = JLabel.new("<html><i>In case of pentesting mod_security or Fortiweb this option setting this option will become very useful<br>Please, notice that if you set length to be 0 then this will ignore checking response size.</i></html>")
     
     @lay_waf.setHorizontalGroup(
       @lay_waf.createParallelGroup(GroupLayout::Alignment::LEADING
@@ -674,8 +674,9 @@ end
     @wordlist = {}
     Dir.glob(paydir+ "*.lsd") do |p|
       #JOptionPane.showMessageDialog(nil, p)
+      @stdout.println("initPayloads => Adding file: " + p.to_s)
       #if File.extname(p) == ".lsd" then
-        @wordlist[File.basename(p, ".*")] = p
+        @wordlist[File.basename(p, ".*")] = p.to_s
         @lst_pay_model.addElement(File.basename(p, ".*"))
       #end
     end
@@ -739,13 +740,16 @@ end
       ## TODO: Multi selection
       # next unless cell.find(k)
       # JOptionPane.showMessageDialog(nil, k + " - " + v)
-      File.open(v).each do |l|
+      fsize = 0
+      File.open(v, "rb").each do |l|
         l = l.chomp
         next if l.empty?
+        fsize = fsize + 1
         @all_payloads[@n_payloads] = l
         @all_wordlists[@n_payloads] = k
         @n_payloads = @n_payloads + 1
       end
+      @stdout.println("Loading: " + v + " - Size: " + fsize.to_s)
     end
     @all_result = Array.new(@n_payloads, false)
     @all_processed = Array.new(@n_payloads, false)
@@ -764,6 +768,8 @@ end
     @res_blocked = (@rdo_blocked.isSelected() or @rdo_all.isSelected())
     @res_passed = (@rdo_passed.isSelected() or @rdo_all.isSelected())
     @cur_pos = 0
+    
+    @stdout.println("loadEmAll: Starting attack with " + @n_payloads.to_s + " payloads")
   end
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
@@ -815,7 +821,7 @@ end
         
         diff = Time.now.to_i - t - TIMEOUT_TRESH
         if diff > @timeout then
-          @all_result[ pos ] = detected
+          @all_result[ pos ] = true
         
           comment = "WTW: Timeout"
         
@@ -829,6 +835,8 @@ end
             comment
           )
         end
+        
+        pos = pos + 1
       end
     end
   end
@@ -923,8 +931,7 @@ end
   #   IHttpRequestResponse messageInfo);
   def processHttpMessage(toolFlag, messageIsRequest, messageInfo)
     return unless toolFlag == 0x20 # DUMMY!
-    # return if messageInfo.getComment().to_s.downcase.include?("baseline")
-    
+    # return if messageInfo.getComment().to_s.downcase.include?("baseline")    
     # JOptionPane.showMessageDialog(nil, "RECV \n" + messageInfo.getComment().to_s)
     
     ## TODO
@@ -968,7 +975,7 @@ end
       
       # # Check Block URL
       if use_redir then
-        JOptionPane.showMessageDialog(nil, "Size: " + @block_page.size.to_s + ", Value: " + @block_page)
+        # JOptionPane.showMessageDialog(nil, "Size: " + @block_page.size.to_s + ", Value: " + @block_page)
         ri.getHeaders().each do |h|
           next if h.nil?
           
