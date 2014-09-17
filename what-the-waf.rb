@@ -65,7 +65,12 @@ java_import 'burp.IProxyListener'
 java_import 'burp.ISessionHandlingAction'
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
-TIMEOUT_TRESH = 5
+VERSION         = "0.15 (alpha)"
+WTW_ACT_NAME    = "What the WAF?!"
+WTW_GEN_NAME    = "What the WAF?!"
+WTW_PRC_NAME    = "What The WAF?!"
+WTW_TAB_CAPTOIN = "What the WAF?!"
+TIMEOUT_TRESH   = 5
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
 def random(len)
@@ -318,7 +323,7 @@ class BurpExtender
     @pan_info.setBorder(BorderFactory.createMatteBorder(0,0,2,0, Color.orange))
     
     lbl_head = JLabel.new("<html><h3>README</h3></html>")
-    lbl_body = JLabel.new("<html><p>1. This extension works beside the Intruder, so send your target request to the Intruder and select your parameters as you always do.<br>2. Under the \"Payloads\" tab select the \"Payload type\" to <b>\"Extension-generated\"</b><br>3. Under the \"Payload Options\" section, click on the \"select generator\" button and choose \"What the WAF?!\".<br>4. Under the \"Payload Processing\" click \"add\" then select <b>\"Invoke Burp Extension\"</b> and choose \"What The WAF?!\" as your processor.<br>5. Start Attack.</p><br><p>Note:<br>1.On the \"Resuls\" tab you can select a row then right-click on it and choose \"Send to repeater\"</p><b>Important Notes:</b><br><p>1. Current version does not support simultaneous attacks.<br>2. Scan one parameter at a time (Sniper mode)</p></html>")
+    lbl_body = JLabel.new("<html><h4>About</h4><p>by _null_ (Sina Hatef)<br>Project Link: <a href=\"https://github.com/null--/what-the-waf\">https://github.com/null--/what-the-waf</a></p><p><h4>How to use</h4>1. This extension works beside the Intruder, so send your target request to the Intruder and select your parameters as you always do.<br>2. Under the \"Payloads\" tab select the \"Payload type\" to <b>\"Extension-generated\"</b><br>3. Under the \"Payload Options\" section, click on the \"select generator\" button and choose \"What the WAF?!\".<br>4. Under the \"Payload Processing\" click \"add\" then select <b>\"Invoke Burp Extension\"</b> and choose \"What The WAF?!\" as your processor.<br>5. Start Attack.</p><p><h4>Note</h4>1.On the \"Resuls\" tab you can select a row then right-click on it and choose \"Send to repeater\"</p><h4>Important Notes</h4><p>1. Current version does not support simultaneous Intruder attacks.<br>2. Scan one parameter at a time (Sniper mode)</p></html>")
     txt_shit = JTextField.new()
     
     @lay_info.setHorizontalGroup(
@@ -387,9 +392,9 @@ end
     lbl_red = JLabel.new("<html><b>WAF Block/Redirection URL</b><br><i>After being detected, Where does WAF redirect you?</i></html>")
     lbl_block_url = JLabel.new("Block/Redirection URL (the \"Location\" Header Field)")
     @txt_block_url = JTextField.new()
-    lbl_timeout = JLabel.new("Block timeout")
+    lbl_timeout = JLabel.new("Block timeout (seconds)")
     @txt_timeout = JTextField.new()
-    lbl_timeout_info = JLabel.new("<html><i>The connection timeout value used by WAF to block a malicious client. (in seconds)</i><b>EXPERIMENTAL</b></html>")
+    lbl_timeout_info = JLabel.new("<html><i>The connection timeout value used by WAF to block a malicious client.</i><b> (EXPERIMENTAL)</b></html>")
     lbl_body = JLabel.new("Search inside body (REGEX)")
     @txt_body = JTextField.new()
     lbl_len = JLabel.new("Length: ")
@@ -846,19 +851,25 @@ end
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
   # String ITab::getTabCaption();
   def getTabCaption
-    "What the WAF?!"
+    WTW_TAB_CAPTOIN
   end
 
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
+  # String IIntruderPayloadProcessor::getProcessorName();
+  def getProcessorName
+    WTW_PRC_NAME
+  end
+  
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
   # String IIntruderPayloadGeneratorFactory::getGeneratorName();
   def getGeneratorName
-    "What The WAF?!"
+    WTW_GEN_NAME
   end
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
   # String ISessionHandlingAction::getActionName();
   def getActionName
-    "What The WAF?!"
+    WTW_ACT_NAME
   end
   
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
@@ -876,12 +887,6 @@ end
     # JOptionPane.showMessageDialog(nil, "New instance")
     @pg = PayGen.new(self)
     return @pg
-  end
-
-# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
-  # String IIntruderPayloadProcessor::getProcessorName();
-  def getProcessorName
-    "What The WAF?!"
   end
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  

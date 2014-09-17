@@ -21,15 +21,3 @@ Click "Select File" and choose "\[foo\]/\[bar\]/what-the-waf.rb"
 ## Usage
 \[TODO\]
 
-## Development
-######Compile burp's jruby script
-jruby HelloWorld.rb -J" -cp burp"  
-
-######Build jar
-rm -r burp  
-mkdir burp  
-javac -d burp/ burp-src/\*.java  
-jruby doc/HelloWorld.rb  
-jrubyc doc/HelloWorld.rb  
-cp HelloWorld.class burp/  
-jar cvf HelloWorld.jar burp/\*.class  
