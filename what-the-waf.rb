@@ -62,7 +62,19 @@ java_import 'burp.IIntruderPayloadGenerator'
 java_import 'burp.IIntruderPayloadGeneratorFactory'
 java_import 'burp.IIntruderPayloadProcessor'
 java_import 'burp.IProxyListener'
+java_import 'burp.ISessionHandlingAction'
 
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
+TIMEOUT_TRESH = 5
+
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
+def random(len)
+  (0...len).map { ('a'..'z').to_a[rand(26)] }.join
+end
+
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
+# ------------------------------ WORDLIST FILTER -------------------------------------- #
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
 class WordlistFilter < FileFilter
   def accept(f)
     return true unless File.file?(f.to_s)
@@ -165,13 +177,12 @@ class PayGen
   attr_accessor :n_payloads
   attr_accessor :all_payloads
   attr_accessor :parent
-
+  attr_accessor :allow
+  
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
-  def initialize(_p, _pp)
+  def initialize(_p)
     @parent = _p
-    @all_payloads = _pp
-    @cur_pos = 0
-    @n_payloads = @all_payloads.size
+    reset
   end
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
@@ -182,8 +193,15 @@ class PayGen
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
   # byte[] IIntruderPayloadGenerator::getNextPayload(byte[] baseValue);
-  def getNextPayload(baseValue)
+  def getNextPayload(baseValue)    
+    while not @allow[@cur_pos] do
+      # JOptionPane.showMessageDialog(nil, "Not allowed: " + @cur_pos.to_s + ": " + @allow[@cur_pos].to_s)
+      # @parent.stdout.println("Stucked for " + (@cur_pos).to_s)
+      sleep(0.1)
+    end
+    
     @parent.all_timestamp[ @cur_pos ] = Time.now.to_i
+    @parent.all_sent[ @cur_pos ] = random(8)
     
     @cur_pos = @cur_pos + 1
     return @all_payloads[@cur_pos - 1].to_java_bytes
@@ -191,13 +209,27 @@ class PayGen
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
   # void IIntruderPayloadGenerator::reset();
-  def reset()
+  def reset
     @cur_pos = 0
+    # @parent.loadEmAll
+    
+    @all_payloads = @parent.all_payloads
+    @n_payloads = @all_payloads.size
+    
+    @allow = Array.new(@n_payloads, false)
+    @allow[0] = true
+    @allow[1] = true
   end
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
   def lastPos
     @cur_pos - 1
+  end
+  
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
+  def allowNext
+    @parent.stdout.println("Allowing " + (@cur_pos+1).to_s)
+    @allow[@cur_pos] = true
   end
 end
 
@@ -205,7 +237,7 @@ end
 # ------------------------------ EXTENSION CLASS -------------------------------------- #
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
 class BurpExtender
-  include IBurpExtender, IExtensionStateListener
+  include IBurpExtender, IExtensionStateListener, ISessionHandlingAction
   include IHttpListener
   include IIntruderAttack, IIntruderPayloadGeneratorFactory, IIntruderPayloadProcessor
   include ITab
@@ -213,12 +245,20 @@ class BurpExtender
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
   attr_accessor :tbl_res
   attr_accessor :tbl_res_model
+  attr_accessor :all_payloads
   attr_accessor :all_result
   attr_accessor :all_response
   attr_accessor :all_timestamp
-
+  attr_accessor :all_sent
+  attr_accessor :all_processed
+  attr_accessor :stdout
+  attr_accessor :stderr
+  
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
   def registerExtenderCallbacks(_burp)
+    @all_sent = []
+    @all_processed = []
+    
     @started = false
     @status = nil
     @all_result = []
@@ -231,10 +271,13 @@ class BurpExtender
     @burp.setExtensionName("What the WAF?!")
     @helper = @burp.getHelpers()
     
+    @burp.registerSessionHandlingAction(self)
     @burp.registerIntruderPayloadGeneratorFactory(self)
     @burp.registerIntruderPayloadProcessor(self)
     @burp.registerHttpListener(self)
     @burp.registerExtensionStateListener(self)
+    @stdout = java.io.PrintWriter.new(@burp.getStdout(), true)
+    @stderr = java.io.PrintWriter.new(@burp.getStderr(), true)
     
     # gui
     # # tabs
@@ -435,7 +478,7 @@ end
       @lay_pay.createParallelGroup(GroupLayout::Alignment::LEADING
         ).addComponent(lbl_pay
         ).addComponent(lbl_sel
-        ).addComponent(@lst_pay_scr, 200, 200, 200
+        ).addComponent(@lst_pay_scr, 450, 450, 450
         ).addComponent(lbl_pay_add
         ).addGroup(@lay_pay.createSequentialGroup(
           ).addComponent(@btn_pay_add
@@ -461,7 +504,7 @@ end
       @lay_pay.createSequentialGroup(
         ).addComponent(lbl_pay
         ).addComponent(lbl_sel
-        ).addComponent(@lst_pay_scr, 200, 200, 200
+        ).addComponent(@lst_pay_scr, 400, 400, 400
         ).addComponent(lbl_pay_add
         ).addGroup(@lay_pay.createParallelGroup(GroupLayout::Alignment::BASELINE
           ).addComponent(@btn_pay_add
@@ -669,6 +712,10 @@ end
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
   def loadEmAll
+    @all_sent = []
+    @total_index = 0
+    @tbl_res_model.setRowCount(0)
+    
     @force_encoding = @chk_encode.isSelected()
     @delay = @txt_delay.getText().to_s.to_i
     @add_prefix = @rdo_pat_left.isSelected()
@@ -683,10 +730,10 @@ end
     
     # JOptionPane.showMessageDialog(nil, "Half Done ...")
     @all_payloads = []
+    @all_processed = []
     @all_wordlists = []
     @n_payloads = 0
     
-    @tbl_res_model.setRowCount(0)
     # cell = @lst_pay.getSelectedValues()
     @wordlist.each do |k,v|
       ## TODO: Multi selection
@@ -701,6 +748,7 @@ end
       end
     end
     @all_result = Array.new(@n_payloads, false)
+    @all_processed = Array.new(@n_payloads, false)
     
     @timeout = @txt_timeout.getText().to_s.to_i
     @block_page = @txt_block_url.getText().to_s
@@ -717,10 +765,72 @@ end
     @res_passed = (@rdo_passed.isSelected() or @rdo_all.isSelected())
     @cur_pos = 0
   end
-  
+
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
   def addResult(w, d, p, r, c)
-    @total_index = @total_index + 1
-    @tbl_res_model.addRow([@total_index, d, w, p, r, c].to_java)    
+    begin
+      @total_index = @total_index + 1
+      @tbl_res_model.addRow([@total_index, d, w, p, r, c].to_java)
+    rescue Exception => e
+      @stderr.println e.message  
+      @stderr.println e.backtrace.inspect 
+    end
+  end
+
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
+  def payloadIndex( pay )
+    i = 0
+    @all_payloads.each do |p|
+      if p == pay then
+        return i
+      end
+    end
+    
+    return i
+  end
+
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
+  def payloadIndexInRequest(req )
+    return -1 if @all_sent.nil?
+    i = 0
+    @all_sent.each do |s|
+      if req.getComment().to_s.include? s then
+        return i
+      end
+      i = i+1
+    end
+    
+    return -1
+  end
+
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
+  def detectTimeouts
+    return if @timeout.nil?
+    use_time = (@timeout > 0)
+    
+    if use_time then
+      pos = 0
+      @all_timestamp.each do |t|
+        next if @all_result[pos]
+        
+        diff = Time.now.to_i - t - TIMEOUT_TRESH
+        if diff > @timeout then
+          @all_result[ pos ] = detected
+        
+          comment = "WTW: Timeout"
+        
+          # if (detected and @res_blocked) or (not detected and @res_passed)
+          # then
+          addResult(
+            @all_wordlists[ pos ],
+            true,
+            @all_payloads[ pos ], 
+            "No response recieved from server in expected time",
+            comment
+          )
+        end
+      end
+    end
   end
   
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
@@ -734,6 +844,12 @@ end
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
   # String IIntruderPayloadGeneratorFactory::getGeneratorName();
   def getGeneratorName
+    "What The WAF?!"
+  end
+
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
+  # String ISessionHandlingAction::getActionName();
+  def getActionName
     "What The WAF?!"
   end
   
@@ -750,7 +866,7 @@ end
     @intruder = attack
     loadEmAll
     # JOptionPane.showMessageDialog(nil, "New instance")
-    @pg = PayGen.new(self, @all_payloads)
+    @pg = PayGen.new(self)
     return @pg
   end
 
@@ -767,13 +883,12 @@ end
   #   byte[] baseValue)
   def processPayload(currentPayload, originalPayload, baseValue)
     ## TODO: Processed payload size does not match the exact @pay_size value
-    
     if @force_encoding then
       currentPayload = @helper.urlEncode(currentPayload)
     end
     
     cs = currentPayload.to_s
-    if @pay_size > 0 and @pattern != "" then
+    if not @pay_size.nil? and @pay_size > 0 and @pattern != "" then
       if cs.size > @pay_size then
         cs = cs[0..@pay_size]
       else
@@ -797,6 +912,7 @@ end
       end
     end
     
+    # @all_sent[ @pg.lastPos ] = random(8)
     return cs.to_java_bytes
   end
 
@@ -807,12 +923,23 @@ end
   #   IHttpRequestResponse messageInfo);
   def processHttpMessage(toolFlag, messageIsRequest, messageInfo)
     return unless toolFlag == 0x20 # DUMMY!
-    return if messageInfo.getComment().to_s.downcase.include?("baseline")
+    # return if messageInfo.getComment().to_s.downcase.include?("baseline")
     
-    # JOptionPane.showMessageDialog(nil, "RECV \n" + messageInfo.getResponse().to_s)
+    # JOptionPane.showMessageDialog(nil, "RECV \n" + messageInfo.getComment().to_s)
+    
     ## TODO
-    if not messageIsRequest and not @pg.nil? then
-      # JOptionPane.showMessageDialog(nil, "RECV \n" + messageInfo.getResponse().to_s)
+    if messageIsRequest and not @pg.nil? then
+      messageInfo.setComment("Touched by WTW, id=" + @all_sent[@pg.lastPos])
+      @pg.allowNext
+    elsif not messageIsRequest and not @pg.nil? then
+      pos = payloadIndexInRequest(messageInfo)
+      
+      if pos < 0 then
+        @stdout.println("Not a WTW request")
+        return
+      end
+      
+      # JOptionPane.showMessageDialog(nil, "POS: " + pos.to_s + "RECV \n" + messageInfo.getResponse().to_s)
       @all_response[ @total_index ] = messageInfo
       ri = @helper.analyzeResponse( messageInfo.getResponse() )
       
@@ -821,8 +948,6 @@ end
       # Check WAF
       use_code = false
       code_mathed = false
-      use_time = (@timeout > 0)
-      time_matched = false
       use_redir = (@block_page.size > 0)
       redir_matched = false
       use_regex = (@regex_str.size > 0)
@@ -857,14 +982,6 @@ end
         end
       end
       
-      # # Check timeout
-      if use_time then
-        diff = Time.now.to_i - @all_timestamp[@pg.lastPos]
-        if diff > @timeout then
-          time_matched = true
-        end
-      end
-      
       # # Regex
       if use_regex then
         body = messageInfo.getResponse().to_s
@@ -882,32 +999,43 @@ end
       # # Final Check
       detected = 
          ((use_code and code_mathed) or not use_code) and 
-         ((use_time and time_matched) or not use_time) and 
          ((use_redir and redir_matched) or not use_redir) and
          ((use_regex and regex_matched) or not use_regex) and
          ((use_reslen and reslen_matched) or not use_reslen) 
-      
+      @all_result[ pos ] = detected
+            
       comment = comment + 
         ", DB: " + detected.to_s + 
         ", CM: " + code_mathed.to_s + 
-        ", TM: " + time_matched.to_s + 
         ", BM: " + redir_matched.to_s +
         ", XM: " + regex_matched.to_s +
         ", LM: " + reslen_matched.to_s
       
-      # if (detected and @res_blocked) or (not detected and @res_passed)
-      # then
+      if (detected and @res_blocked) or (not detected and @res_passed)
+      then
         addResult(
-          @all_wordlists[ @pg.lastPos ],
+          @all_wordlists[ pos ],
           detected,
-          @all_payloads[ @pg.lastPos ], 
-          @all_response[ @total_index ].getRequest().to_s,
+          @all_payloads[ pos ], 
+          messageInfo.getRequest().to_s,
           comment
         )
-      # end
+      end
+      
+      @all_processed[ pos ] = true
     end
+    
+    detectTimeouts
   end
 
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
+  # void ISessionHandlingAction::performAction(
+  #           IHttpRequestResponse currentRequest,
+  #           IHttpRequestResponse[] macroItems);
+  def performAction(currentRequest, macroItems)
+    # TODO
+  end
+  
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
   # void extensionUnloaded();
   def extensionUnloaded
