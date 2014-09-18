@@ -1,9 +1,26 @@
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
-# What the WAF?! extension for burp                                                     #
+# What The WAF?! extension for burp                                                     #
 #                                                                                       #
 # by _null_                                                                             #
 # source code (GPLv3) is available at github: https://github.com/null--/what-the-waf    #
 #                                                                                       #
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
+
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
+VERSION         = "1.1 (beta)"
+DEBUG           = true
+
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
+$_BURP_STD_OUT_  = nil
+$_BURP_STD_ERR_  = nil
+
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
+WTW_ACT_NAME    = "What The WAF?!"
+WTW_GEN_NAME    = "What The WAF?!"
+WTW_PRC_NAME    = "What The WAF?!"
+WTW_TAB_CAPTOIN = "What The WAF?!"
+TIMEOUT_TRESH   = 5
+
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
 require 'java'
 
@@ -15,6 +32,7 @@ java_import java.awt.BorderLayout
 java_import java.awt.FlowLayout
 java_import java.awt.GridLayout
 java_import java.awt.Container
+java_import java.awt.Toolkit
 java_import java.awt.event.MouseAdapter
 java_import javax.swing.JTable
 java_import javax.swing.JPopupMenu
@@ -65,16 +83,74 @@ java_import 'burp.IProxyListener'
 java_import 'burp.ISessionHandlingAction'
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
-VERSION         = "0.15 (alpha)"
-WTW_ACT_NAME    = "What the WAF?!"
-WTW_GEN_NAME    = "What the WAF?!"
-WTW_PRC_NAME    = "What The WAF?!"
-WTW_TAB_CAPTOIN = "What the WAF?!"
-TIMEOUT_TRESH   = 5
+def COUT(str)
+  return if $_BURP_STD_OUT_.nil?
+  return if not DEBUG
+  
+  $_BURP_STD_OUT_.println(str)
+end
+
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
+def CERR(str)
+  return if $_BURP_STD_ERR_.nil?
+  
+  $_BURP_STD_ERR_.println(str)
+end
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
 def random(len)
   (0...len).map { ('a'..'z').to_a[rand(26)] }.join
+end
+
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
+# --------------------------------- MONSTER STATE ------------------------------------- #
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
+class MonsterState
+  attr_reader :id
+  attr_reader :timestamp
+  
+  attr_accessor :allow
+  
+  attr_accessor :payload
+  attr_accessor :wordlist
+  
+  attr_accessor :service
+  attr_accessor :request
+  attr_accessor :response
+  
+  attr_accessor :processed
+  attr_accessor :detected
+  
+  attr_accessor :comment
+
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
+  def initialize
+    @id = random(8)
+    @allow = false
+    
+    @comment = ""
+    @processed = false
+    @detected = false
+    
+    @service = nil
+    @response = nil
+    @request = nil
+    
+    @paylaod = ""
+    @wordlist = ""
+    
+    setTime
+  end
+
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
+  def setTime
+    @timestamp = Time.now.to_i
+  end
+
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
+  def age
+    Time.now.to_i - @timestamp - TIMEOUT_TRESH
+  end
 end
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
@@ -89,7 +165,8 @@ class WordlistFilter < FileFilter
     
     return false
   end
-  
+
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
   def getDescription
     "Line-seperated Wordlist Files (*.txt or *.lsd)"
   end
@@ -119,10 +196,6 @@ end
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
 class MyTableRenderer < DefaultTableCellRenderer
   def getTableCellRendererComponent(table, value, isSelected, hasFocus, row, col)
-    # c = DefaultTableCellRenderer.instance_method(
-    #   getTableCellRendererComponent).bind(self).call(
-    #     table, value, isSelected, hasFocus, row, col)
-    
     c = super(table, value, isSelected, hasFocus, row, col)
     
     if table.getModel().getValueAt(row, 1) then
@@ -154,7 +227,7 @@ class ResultMouse < MouseAdapter
   def createMenu(_parent)
     @parent = _parent
     @mnu_send_to_rep.addActionListener do |e|
-      @parent.popupSendtoRepeater(e)
+      sendToRepeater(e)
     end
   end
 
@@ -170,6 +243,19 @@ class ResultMouse < MouseAdapter
       @popup.show(e.getComponent(), e.getX(), e.getY())
     end
   end
+  
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
+  def sendToRepeater(e)
+    row = @parent.tbl_res.getSelectedRow
+    
+    @parent.burp.sendToRepeater(
+      @parent.table_monster_map[row].service.getHost, 
+      @parent.table_monster_map[row].service.getPort, 
+      @parent.table_monster_map[row].service.getProtocol == "https", 
+      @parent.table_monster_map[row].request,
+      ("What The WAF?! #" + (row+1).to_s).to_java_string 
+    )
+  end
 end
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
@@ -179,11 +265,8 @@ class PayGen
   include IIntruderPayloadGenerator
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
   attr_accessor :cur_pos
-  attr_accessor :n_payloads
-  attr_accessor :all_payloads
   attr_accessor :parent
-  attr_accessor :allow
-  
+
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
   def initialize(_p)
     @parent = _p
@@ -193,23 +276,23 @@ class PayGen
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
   # boolean IIntruderPayloadGenerator::hasMorePayloads();
   def hasMorePayloads
-    return (@cur_pos < @n_payloads)
+    return (@cur_pos < @parent.monsters.size)
   end
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
   # byte[] IIntruderPayloadGenerator::getNextPayload(byte[] baseValue);
   def getNextPayload(baseValue)    
-    while not @allow[@cur_pos] do
+    while not @parent.monsters[@cur_pos].allow do
       # JOptionPane.showMessageDialog(nil, "Not allowed: " + @cur_pos.to_s + ": " + @allow[@cur_pos].to_s)
-      # @parent.stdout.println("Stucked for " + (@cur_pos).to_s)
+      @parent.stdout.println("Stucked for " + (@cur_pos).to_s)
       sleep(0.1)
     end
     
-    @parent.all_timestamp[ @cur_pos ] = Time.now.to_i
-    @parent.all_sent[ @cur_pos ] = random(8)
+    @parent.monsters[@cur_pos].setTime
+    p = @parent.monsters[@cur_pos].payload
     
     @cur_pos = @cur_pos + 1
-    return @all_payloads[@cur_pos - 1].to_java_bytes
+    return p.to_java_bytes
   end
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
@@ -218,12 +301,8 @@ class PayGen
     @cur_pos = 0
     @parent.loadEmAll
     
-    @all_payloads = @parent.all_payloads
-    @n_payloads = @all_payloads.size
-    
-    @allow = Array.new(@n_payloads, false)
-    @allow[0] = true
-    @allow[1] = true
+    @parent.monsters[0].allow = true
+    @parent.monsters[1].allow = true
   end
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
@@ -233,8 +312,8 @@ class PayGen
   
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
   def allowNext
-    # @parent.stdout.println("Allowing " + (@cur_pos+1).to_s)
-    @allow[@cur_pos] = true
+    @parent.stdout.println("Allowing " + (@cur_pos+1).to_s)
+    @parent.monsters[@cur_pos].allow = true
   end
 end
 
@@ -248,27 +327,22 @@ class BurpExtender
   include ITab
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
+  attr_accessor :burp
+  
   attr_accessor :tbl_res
   attr_accessor :tbl_res_model
-  attr_accessor :all_payloads
-  attr_accessor :all_result
-  attr_accessor :all_response
-  attr_accessor :all_timestamp
-  attr_accessor :all_sent
-  attr_accessor :all_processed
+  
   attr_accessor :stdout
   attr_accessor :stderr
   
+  attr_accessor :monsters
+  attr_accessor :table_monster_map
+  
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
   def registerExtenderCallbacks(_burp)
-    @all_sent = []
-    @all_processed = []
+    @monsters = []
+    @table_monster_map = []
     
-    @started = false
-    @status = nil
-    @all_result = []
-    @all_response = []
-    @all_timestamp = []
     @intruder = nil
     
     # init
@@ -281,8 +355,8 @@ class BurpExtender
     @burp.registerIntruderPayloadProcessor(self)
     @burp.registerHttpListener(self)
     @burp.registerExtensionStateListener(self)
-    @stdout = java.io.PrintWriter.new(@burp.getStdout(), true)
-    @stderr = java.io.PrintWriter.new(@burp.getStderr(), true)
+    $_BURP_STD_OUT_ = java.io.PrintWriter.new(@burp.getStdout(), true)
+    $_BURP_STD_ERR_ = java.io.PrintWriter.new(@burp.getStderr(), true)
     
     # gui
     # # tabs
@@ -292,7 +366,7 @@ class BurpExtender
     initResultUI
     initReadmeUI
     
-    initPayloads
+    initWordlists
 
     @burp.customizeUiComponent(@tabs)
     @burp.addSuiteTab(self)
@@ -590,16 +664,16 @@ end
     
     # Add Action Listeners
     @btn_pay_add.addActionListener do |e|
-      addPayload(e)
+      addWordlist(e)
     end
     @btn_pay_rem.addActionListener do |e|
-      removePayload(e)
+      removeWordlist(e)
     end
     @btn_pay_cls.addActionListener do |e|
-      clearPayload(e)
+      clearWordlists(e)
     end
     @btn_pay_def.addActionListener do |e|
-      initPayloads
+      initWordlists
     end
   end
 
@@ -658,28 +732,14 @@ end
   end
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
-  def popupSendtoRepeater(e)
-    row = @tbl_res.getSelectedRow
-    # JOptionPane.showMessageDialog(nil, @all_response[row].getHttpService().getHost().to_s + ":" + @all_response[row].getHttpService.getPort.to_s + "\n" + @all_response[row].getRequest().to_s)
-    
-    @burp.sendToRepeater(
-      @all_response[row].getHttpService().getHost, 
-      @all_response[row].getHttpService().getPort, 
-      @all_response[row].getHttpService().getProtocol() == "https", 
-      @all_response[row].getRequest(),
-      ("What the WAF?! #" + (row+1).to_s).to_java_string 
-    )
-  end
-
-# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
-  def initPayloads
-    clearPayload
+  def initWordlists
+    clearWordlists
     
     paydir = File.expand_path(File.dirname(__FILE__)) + "/payloads/"
     @wordlist = {}
     Dir.glob(paydir+ "*.lsd") do |p|
       #JOptionPane.showMessageDialog(nil, p)
-      @stdout.println("initPayloads => Adding file: " + p.to_s)
+      COUT("initWordlists => Adding file: " + p.to_s)
       #if File.extname(p) == ".lsd" then
         @wordlist[File.basename(p, ".*")] = p.to_s
         @lst_pay_model.addElement(File.basename(p, ".*"))
@@ -688,7 +748,7 @@ end
   end
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
-  def addPayload(e)
+  def addWordlist(e)
     fc = JFileChooser.new()
     fc.setFileFilter(WordlistFilter.new())
     
@@ -701,7 +761,7 @@ end
   end
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
-  def removePayload(e)
+  def removeWordlist(e)
     i = @lst_pay.getSelectedIndex()
     n = @lst_pay_model.getElementAt(i).to_s
     if (i != -1) and (@wordlist.has_key? n) then
@@ -711,14 +771,13 @@ end
   end
   
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
-  def clearPayload(e = nil)
+  def clearWordlists(e = nil)
     @wordlist.clear unless @wordlist.nil?
     @lst_pay_model.removeAllElements() unless @lst_pay_model.nil?
   end
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
   def loadEmAll
-    @all_sent = []
     @total_index = 0
     @tbl_res_model.setRowCount(0)
     
@@ -735,29 +794,22 @@ end
     @pay_size = @txt_pay_size.getText().to_s.to_i
     
     # JOptionPane.showMessageDialog(nil, "Half Done ...")
-    @all_payloads = []
-    @all_processed = []
-    @all_wordlists = []
-    @n_payloads = 0
-    
-    # cell = @lst_pay.getSelectedValues()
+    @monsters.clear
+    n = 0
     @wordlist.each do |k,v|
-      ## TODO: Multi selection
-      # next unless cell.find(k)
-      # JOptionPane.showMessageDialog(nil, k + " - " + v)
       fsize = 0
       File.open(v, "rb").each do |l|
         l = l.chomp
         next if l.empty?
         fsize = fsize + 1
-        @all_payloads[@n_payloads] = l
-        @all_wordlists[@n_payloads] = k
-        @n_payloads = @n_payloads + 1
+        
+        @monsters[n] = MonsterState.new
+        @monsters[n].payload = l
+        @monsters[n].wordlist = k
+        n = n + 1
       end
-      @stdout.println("Loading: " + v + " - Size: " + fsize.to_s)
+      COUT("Loading: " + v + " - Size: " + fsize.to_s)
     end
-    @all_result = Array.new(@n_payloads, false)
-    @all_processed = Array.new(@n_payloads, false)
     
     @timeout = @txt_timeout.getText().to_s.to_i
     @block_page = @txt_block_url.getText().to_s
@@ -765,33 +817,46 @@ end
     @regex = Regexp.new @regex_str
     @reslen = @txt_len.getText().to_s.to_i
     
-    @response = {}
+    @resp_code = {}
     @chk.each do |c,b|
-      @response[c] = @chk[c].isSelected()
+      @resp_code[c] = @chk[c].isSelected()
     end
     
     @res_blocked = (@rdo_blocked.isSelected() or @rdo_all.isSelected())
     @res_passed = (@rdo_passed.isSelected() or @rdo_all.isSelected())
-    @cur_pos = 0
     
-    @stdout.println("loadEmAll: Starting attack with " + @n_payloads.to_s + " payloads")
+    COUT("loadEmAll: Starting attack with " + @monsters.size.to_s + " payloads")
   end
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
-  def addResult(w, d, p, r, c)
+  def addResult( a_monster )
     begin
+      if a_monster.response.nil? then
+        resp = "No response recieved from server in expected time" 
+      else
+        resp = a_monster.response.to_s
+      end
+      
       @total_index = @total_index + 1
-      @tbl_res_model.addRow([@total_index, d, w, p, r, c].to_java)
+      @tbl_res_model.addRow([
+        @total_index, 
+        a_monster.detected, 
+        a_monster.wordlist, 
+        a_monster.payload,
+        resp, 
+        a_monster.comment].to_java)
+        
+      @table_monster_map[ @total_index ] = a_monster
     rescue Exception => e
-      @stderr.println e.message  
-      @stderr.println e.backtrace.inspect 
+      CERR e.message  
+      CERR e.backtrace.inspect 
     end
   end
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
   def payloadIndex( pay )
     i = 0
-    @all_payloads.each do |p|
+    @monsters.each do |p|
       if p == pay then
         return i
       end
@@ -801,11 +866,11 @@ end
   end
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
-  def payloadIndexInRequest(req )
-    return -1 if @all_sent.nil?
+  def findMonster(req )
+    return -1 if @monsters.nil?
     i = 0
-    @all_sent.each do |s|
-      if req.getComment().to_s.include? s then
+    @monsters.each do |m|
+      if req.getComment().to_s.include? m.id then
         return i
       end
       i = i+1
@@ -820,25 +885,19 @@ end
     use_time = (@timeout > 0)
     
     if use_time then
+      ## TODO: Is this accurate?
       pos = 0
-      @all_timestamp.each do |t|
-        next if @all_result[pos]
+      @monsters.each do |m|
+        next if m.processed
         
-        diff = Time.now.to_i - t - TIMEOUT_TRESH
+        diff = m.age
         if diff > @timeout then
-          @all_result[ pos ] = true
-        
-          comment = "WTW: Timeout"
-        
-          # if (detected and @res_blocked) or (not detected and @res_passed)
-          # then
-          addResult(
-            @all_wordlists[ pos ],
-            true,
-            @all_payloads[ pos ], 
-            "No response recieved from server in expected time",
-            comment
-          )
+          m.processed = true
+          m.detected = true
+          m.response = nil
+          m.comment = "WTW: Timeout"
+          
+          addResult(m)
         end
         
         pos = pos + 1
@@ -896,6 +955,7 @@ end
   #   byte[] baseValue)
   def processPayload(currentPayload, originalPayload, baseValue)
     ## TODO: Processed payload size does not match the exact @pay_size value
+    ## TODO: Test logical flow
     if @force_encoding then
       currentPayload = @helper.urlEncode(currentPayload)
     end
@@ -925,7 +985,6 @@ end
       end
     end
     
-    # @all_sent[ @pg.lastPos ] = random(8)
     return cs.to_java_bytes
   end
 
@@ -935,37 +994,41 @@ end
   #   boolean messageIsRequest, 
   #   IHttpRequestResponse messageInfo);
   def processHttpMessage(toolFlag, messageIsRequest, messageInfo)
-    return unless toolFlag == 0x20 # DUMMY!
-    # return if messageInfo.getComment().to_s.downcase.include?("baseline")    
-    # JOptionPane.showMessageDialog(nil, "RECV \n" + messageInfo.getComment().to_s)
-    
-    ## TODO
+    return unless toolFlag == 0x20 # DUMMY!    
+    ## TODO: Test logical flow
     if messageIsRequest and not @pg.nil? then
-      messageInfo.setComment("Touched by WTW, id=" + @all_sent[@pg.lastPos])
+      COUT("Preparing the monster")
+      
+      @monsters[@pg.lastPos].setTime
+      @monsters[@pg.lastPos].request = messageInfo.getRequest()
+      @monsters[@pg.lastPos].service = messageInfo.getHttpService()
+      
+      messageInfo.setComment("Touched by WTW, id=" + @monsters[@pg.lastPos].id)
       @pg.allowNext
     elsif not messageIsRequest and not @pg.nil? then
-      pos = payloadIndexInRequest(messageInfo)
+      pos = findMonster(messageInfo)
       
       if pos < 0 then
-        @stdout.println("Not a WTW request")
+        COUT("Not a WTW request")
         return
       end
       
+      @monsters[pos].response = messageInfo.getResponse
+      
       # JOptionPane.showMessageDialog(nil, "POS: " + pos.to_s + "RECV \n" + messageInfo.getResponse().to_s)
-      @all_response[ @total_index ] = messageInfo
       ri = @helper.analyzeResponse( messageInfo.getResponse() )
       
       comment = ""
       
       # Check WAF
-      use_code = false
-      code_mathed = false
-      use_redir = (@block_page.size > 0)
-      redir_matched = false
-      use_regex = (@regex_str.size > 0)
-      regex_matched = false
-      use_reslen = (@reslen > 0)
-      reslen_matched = false
+      use_code        = false
+      code_mathed     = false
+      use_redir       = (@block_page.size > 0)
+      redir_matched   = false
+      use_regex       = (@regex_str.size > 0)
+      regex_matched   = false
+      use_reslen      = (@reslen > 0)
+      reslen_matched  = false
       
       # # Check HTTP status code
       @chk.each do |n,c|
@@ -1009,32 +1072,25 @@ end
       end
       
       # # Final Check
-      detected = 
+      @monsters[pos].detected = 
          ((use_code and code_mathed) or not use_code) and 
          ((use_redir and redir_matched) or not use_redir) and
          ((use_regex and regex_matched) or not use_regex) and
          ((use_reslen and reslen_matched) or not use_reslen) 
-      @all_result[ pos ] = detected
-            
-      comment = comment + 
-        ", DB: " + detected.to_s + 
+      @monsters[pos].comment = comment + 
+        ", DB: " + @monsters[pos].detected.to_s + 
         ", CM: " + code_mathed.to_s + 
         ", BM: " + redir_matched.to_s +
         ", XM: " + regex_matched.to_s +
         ", LM: " + reslen_matched.to_s
       
-      if (detected and @res_blocked) or (not detected and @res_passed)
+      if (@monsters[pos].detected and @res_blocked) or 
+         (not @monsters[pos].detected and @res_passed)
       then
-        addResult(
-          @all_wordlists[ pos ],
-          detected,
-          @all_payloads[ pos ], 
-          messageInfo.getRequest().to_s,
-          comment
-        )
+        addResult(@monsters[pos])
       end
       
-      @all_processed[ pos ] = true
+      @monsters[ pos ].processed = true
     end
     
     detectTimeouts
@@ -1045,13 +1101,13 @@ end
   #           IHttpRequestResponse currentRequest,
   #           IHttpRequestResponse[] macroItems);
   def performAction(currentRequest, macroItems)
-    # TODO
+    ## TODO: Is it better to use this method instead of processHttpMessage?
   end
   
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
   # void extensionUnloaded();
   def extensionUnloaded
-    ## TODO
+    ## TODO: Nothing, yet!
   end
 end
 
