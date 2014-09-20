@@ -5,6 +5,7 @@
 # source code (GPLv3) is available at github: https://github.com/null--/what-the-waf    #
 #                                                                                       #
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
+## TODO A handy panel to bypass WAF (after detection WAF weaknesses)
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
 VERSION         = "1.1 (beta)"
@@ -428,14 +429,15 @@ end
     container = JPanel.new()
     @tab_tgt = @tabs.addTab("Target", container)
     
-    container.setLayout(BorderLayout.new())
+    container.setLayout(BorderLayout.new) #(0, 200))
     container.setBorder(EmptyBorder.new( 3, 3, 3, 3 ) )
+    
     @pan_tgt = JPanel.new()
     @lay_tgt = GroupLayout.new(@pan_tgt)
     @pan_tgt.setLayout(@lay_tgt)
     scroll = JScrollPane.new(@pan_tgt)
     container.add(scroll, BorderLayout::CENTER)
-    
+    # container.add(JPanel.new(BorderLayout::RIGHT) # GAP
     # # WAF PANEL # #
     @pan_waf = JPanel.new()
     @lay_waf = GroupLayout.new(@pan_waf)
@@ -464,16 +466,16 @@ end
       pan_code.add(c)
     end
     lbl_red = JLabel.new("<html><b>WAF Block/Redirection URL</b><br><i>After being detected, Where does WAF redirect you?</i></html>")
-    lbl_block_url = JLabel.new("Block/Redirection URL (the \"Location\" Header Field)")
+    lbl_block_url = JLabel.new("Block/Redirection URL (the \"Location\" Header Field):")
     @txt_block_url = JTextField.new()
-    lbl_timeout = JLabel.new("Block timeout (seconds)")
+    lbl_timeout = JLabel.new("Block timeout (seconds):")
     @txt_timeout = JTextField.new()
     lbl_timeout_info = JLabel.new("<html><i>The connection timeout value used by WAF to block a malicious client.</i><b> (EXPERIMENTAL)</b></html>")
-    lbl_body = JLabel.new("Search inside body (REGEX)")
+    lbl_body = JLabel.new("Find in body (REGEX):")
     @txt_body = JTextField.new()
     lbl_len = JLabel.new("Length: ")
     @txt_len = JTextField.new("0")
-    lbl_len_info = JLabel.new("<html><i>In case of pentesting mod_security or Fortiweb this option setting this option will become very useful<br>Please, notice that if you set length to be 0 then this will ignore checking response size.</i></html>")
+    lbl_len_info = JLabel.new("<html><i>In case of pentesting mod_security or Fortiweb, this option will become very useful<br>Please, notice that if you set length to be 0 then this will ignore checking response size.</i></html>")
     
     @lay_waf.setHorizontalGroup(
       @lay_waf.createParallelGroup(GroupLayout::Alignment::LEADING
@@ -481,19 +483,19 @@ end
         ).addComponent(lbl_hcode
         ).addComponent(pan_code
         ).addComponent(lbl_red
-        ).addGroup(@lay_waf.createSequentialGroup(
+#        ).addGroup(@lay_waf.createSequentialGroup(
           ).addComponent(lbl_block_url
-          ).addComponent(@txt_block_url, 300, 500, 600)
-        ).addGroup(@lay_waf.createSequentialGroup(
+          ).addComponent(@txt_block_url, 300, 500, 600 #)
+#        ).addGroup(@lay_waf.createSequentialGroup(
           ).addComponent(lbl_timeout
-          ).addComponent(@txt_timeout, 100, 100, 100)
+          ).addComponent(@txt_timeout, 100, 100, 100 #)
         ).addComponent(lbl_timeout_info
-        ).addGroup(@lay_waf.createSequentialGroup(
+#        ).addGroup(@lay_waf.createSequentialGroup(
           ).addComponent(lbl_body
-          ).addComponent(@txt_body, 300, 500, 600)
-        ).addGroup(@lay_waf.createSequentialGroup(
+          ).addComponent(@txt_body, 300, 500, 600 #)
+#        ).addGroup(@lay_waf.createSequentialGroup #(
           ).addComponent(lbl_len
-          ).addComponent(@txt_len, 100, 100, 100)
+          ).addComponent(@txt_len, 100, 100, 100 #)
         ).addComponent(lbl_len_info)
     )
     
@@ -503,19 +505,19 @@ end
         ).addComponent(lbl_hcode
         ).addComponent(pan_code
         ).addComponent(lbl_red
-        ).addGroup(@lay_waf.createParallelGroup(GroupLayout::Alignment::BASELINE
+#        ).addGroup(@lay_waf.createParallelGroup(GroupLayout::Alignment::BASELINE
           ).addComponent(lbl_block_url
-          ).addComponent(@txt_block_url)
-        ).addGroup(@lay_waf.createParallelGroup(GroupLayout::Alignment::BASELINE
+          ).addComponent(@txt_block_url #)
+#        ).addGroup(@lay_waf.createParallelGroup(GroupLayout::Alignment::BASELINE
           ).addComponent(lbl_timeout
-          ).addComponent(@txt_timeout)
+          ).addComponent(@txt_timeout #)
         ).addComponent(lbl_timeout_info
-        ).addGroup(@lay_waf.createParallelGroup(GroupLayout::Alignment::BASELINE
+#        ).addGroup(@lay_waf.createParallelGroup(GroupLayout::Alignment::BASELINE
           ).addComponent(lbl_body
-          ).addComponent(@txt_body)
-        ).addGroup(@lay_waf.createParallelGroup(GroupLayout::Alignment::BASELINE
+          ).addComponent(@txt_body #)
+#        ).addGroup(@lay_waf.createParallelGroup(GroupLayout::Alignment::BASELINE
           ).addComponent(lbl_len
-          ).addComponent(@txt_len)
+          ).addComponent(@txt_len #)
         ).addComponent(lbl_len_info)
     )
     
@@ -538,10 +540,10 @@ end
     @btn_pay_cls = JButton.new("Clear")
     @btn_pay_def = JButton.new("Default")
     lbl_cont = JLabel.new("<html><br><b>Payload Factory</b></html>")
-    lbl_pay_size = JLabel.new("Payload size")
+    lbl_pay_size = JLabel.new("Payload size:")
     @txt_pay_size = JTextField.new("0")
     lbl_pay_size_info = JLabel.new("<html><i>'0' means: Do not add pattern<br></i></html>")
-    lbl_pay_pat = JLabel.new("Pattern")
+    lbl_pay_pat = JLabel.new("Pattern:")
     @txt_pay_pat = JTextField.new("")
     lbl_pay_pat_info = JLabel.new("<html><i>If the payload length be less than the \"Minimum payload size\", this pattern will be used to increase the size of payload.<br></i></html>")
     lbl_pat_grp = JLabel.new("<html><br><b>Prefix/Suffix</b></html>")
@@ -565,13 +567,13 @@ end
           ).addComponent(@btn_pay_cls
           ).addComponent(@btn_pay_def)
         ).addComponent(lbl_cont
-        ).addGroup(@lay_pay.createSequentialGroup(
+#        ).addGroup(@lay_pay.createSequentialGroup(
           ).addComponent(lbl_pay_size
-          ).addComponent(@txt_pay_size, 100, 100, 100)
+          ).addComponent(@txt_pay_size, 100, 100, 100 #)
         ).addComponent(lbl_pay_size_info
-        ).addGroup(@lay_pay.createSequentialGroup(
+#        ).addGroup(@lay_pay.createSequentialGroup(
           ).addComponent(lbl_pay_pat
-          ).addComponent(@txt_pay_pat,300,300,300)
+          ).addComponent(@txt_pay_pat,300,300,300 #)
         ).addComponent(lbl_pay_pat_info
         ).addComponent(lbl_pat_grp
         ).addComponent(@rdo_pat_left
@@ -591,13 +593,13 @@ end
           ).addComponent(@btn_pay_cls
           ).addComponent(@btn_pay_def)
         ).addComponent(lbl_cont
-        ).addGroup(@lay_pay.createParallelGroup(GroupLayout::Alignment::BASELINE
+#        ).addGroup(@lay_pay.createParallelGroup(GroupLayout::Alignment::BASELINE
           ).addComponent(lbl_pay_size
-          ).addComponent(@txt_pay_size)
+          ).addComponent(@txt_pay_size #)
         ).addComponent(lbl_pay_size_info
-        ).addGroup(@lay_pay.createParallelGroup(GroupLayout::Alignment::BASELINE
+#        ).addGroup(@lay_pay.createParallelGroup(GroupLayout::Alignment::BASELINE
           ).addComponent(lbl_pay_pat
-          ).addComponent(@txt_pay_pat)
+          ).addComponent(@txt_pay_pat #)
         ).addComponent(lbl_pay_pat_info
         ).addComponent(lbl_pat_grp
         ).addComponent(@rdo_pat_left
