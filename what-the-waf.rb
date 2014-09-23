@@ -1,7 +1,7 @@
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
 # What The WAF?! extension for burp                                                     #
 #                                                                                       #
-# by _null_                                                                             #
+# by _null_ (Sina Hatef)                                                                #
 # source code (GPLv3) is available at github: https://github.com/null--/what-the-waf    #
 #                                                                                       #
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
@@ -81,7 +81,7 @@ java_import 'burp.ISessionHandlingAction'
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
 def COUT(str)
-  return if BurpExtender._BURP_STD_OUT_.nil?
+  # return if BurpExtender._BURP_STD_OUT_.nil?
   return unless DEBUG
   
   BurpExtender._BURP_STD_OUT_.println(str)
@@ -89,7 +89,7 @@ end
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
 def CERR(str)
-  return if BurpExtender._BURP_STD_ERR_.nil?
+  # return if BurpExtender._BURP_STD_ERR_.nil?
   
   BurpExtender._BURP_STD_ERR_.println(str)
 end
@@ -243,7 +243,7 @@ class ResultMouse < MouseAdapter
   
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
   def sendToRepeater(e)
-    row = @parent.tbl_res.getSelectedRow
+    row = @parent.tbl_res.getSelectedRow + 1
     
     @parent.burp.sendToRepeater(
       @parent.table_monster_map[row].service.getHost, 
@@ -296,7 +296,7 @@ class PayGen
   # void IIntruderPayloadGenerator::reset();
   def reset
     @cur_pos = 0
-    @parent.loadEmAll
+    # @parent.loadEmAll
     
     @parent.monsters[0].allow = true unless @parent.monsters[0].nil?
     # @parent.monsters[1].allow = true unless @parent.monsters[1].nil?
@@ -365,8 +365,8 @@ class BurpExtender
     @burp.registerHttpListener(self)
     @burp.registerExtensionStateListener(self)
     
-    _BURP_STD_OUT_ = java.io.PrintWriter.new(@burp.getStdout(), true) if _BURP_STD_OUT_.nil?
-    _BURP_STD_ERR_ = java.io.PrintWriter.new(@burp.getStderr(), true) if _BURP_STD_ERR_.nil?
+    @@_BURP_STD_OUT_ = java.io.PrintWriter.new(@burp.getStdout(), true) if @@_BURP_STD_OUT_.nil?
+    @@_BURP_STD_ERR_ = java.io.PrintWriter.new(@burp.getStderr(), true) if @@_BURP_STD_ERR_.nil?
     
     # gui
     # # tabs
@@ -407,7 +407,27 @@ class BurpExtender
     @pan_info.setBorder(BorderFactory.createMatteBorder(0,0,2,0, Color.orange))
     
     lbl_head = JLabel.new("<html><h3>README</h3></html>")
-    lbl_body = JLabel.new("<html><h4>About</h4><p>version: " + VERSION + "<i><br>by _null_ (Sina Hatef)<br>Project Link: <a href=\"https://github.com/null--/what-the-waf\">https://github.com/null--/what-the-waf</a></i></p><p><h4>How to use</h4>1. This extension works beside the Intruder, so send your target request to the Intruder and select your parameters as you always do.<br>2. Under the \"Payloads\" tab select the \"Payload type\" to <b>\"Extension-generated\"</b><br>3. Under the \"Payload Options\" section, click on the \"select generator\" button and choose \"What the WAF?!\".<br>4. Under the \"Payload Processing\" click \"add\" then select <b>\"Invoke Burp Extension\"</b> and choose \"What The WAF?!\" as your processor.<br>5. Start Attack.</p><p><h4>Note</h4>1.On the \"Resuls\" tab you can select a row then right-click on it and choose \"Send to repeater\"</p><h4>Important Notes</h4><p>1. Current version does not support simultaneous Intruder attacks.<br>2. Scan one parameter at a time (Sniper mode)</p></html>")
+    lbl_body = JLabel.new(
+    "<html><h4>About</h4><p>version: " + VERSION + 
+    "<i><br>by _null_ (Sina Hatef)" + 
+    "<br>Project Link: <a href=\"https://github.com/null--/what-the-waf\">" + 
+    "https://github.com/null--/what-the-waf</a></i></p>" + 
+    "<p><h4>How to use</h4>" + 
+    "1. This extension works beside the Intruder, so send your target request to the Intruder " + 
+    "and select your parameters as you always do.<br>" + 
+    "2. Under the \"Payloads\" tab select the \"Payload type\" to <b>\"Extension-generated\"</b><br>" + 
+    "3. Under the \"Payload Options\" section, click on the \"select generator\" button and" + 
+    "choose \"What the WAF?!\".<br>" + 
+    "4. Under the \"Payload Processing\" click \"add\" then select <b>\"Invoke Burp Extension\"" +
+    "</b> and choose \"What The WAF?!\" as your processor.<br>" + 
+    "5. Start Attack.</p>" + 
+    "<p><h4>Note</h4>" + 
+    "1.On the \"Resuls\" tab you can select a row then right-click on it and choose" + 
+    "\"Send to repeater\"</p>" + 
+    "<h4>Important Notes</h4>" + 
+    "<p>1. Current version does not support simultaneous Intruder attacks.<br>" + 
+    "2. Scan one parameter at a time (<b>single param</b> + sniper mode)</p></html>")
+    
     txt_shit = JTextField.new()
     
     @lay_info.setHorizontalGroup(
@@ -454,7 +474,7 @@ end
     @lay_waf.setAutoCreateContainerGaps(true)
     @pan_waf.setLayout(@lay_waf)
     @pan_waf.setBorder(BorderFactory.createMatteBorder(0,0,2,0, Color.orange))
-    lbl_waf = JLabel.new("<html><h3>WAF Options</h3></html>")
+    lbl_waf = JLabel.new("<html><p>ALWAYS SAVE YOUR BURP STATE, BEFORE DOING SOMETHING NASTY!</p><h3>WAF Options</h3></html>")
     
     lbl_hcode = JLabel.new("<html><b>WAF HTTP Response CODE</b><br><i>HTTP response code(s) used by WAF to block malicious requests</i></html>")
     @chk = {}
@@ -729,7 +749,8 @@ end
     @pan_res.setLayout(@lay_res)
     container.add(@pan_res, BorderLayout::CENTER)
     
-    lbl_passed = JLabel.new("<html><i>You can select a row then press Ctrl+C to copy its content or right-click on it and choose \"Send to repeater\"</i></html>")
+    lbl_passed = JLabel.new("<html><i>You can select a row then press Ctrl+C to copy" +
+        "its content or right-click on it and choose \"Send to repeater\"</i></html>")
     @tbl_res_model = MyTableModel.new()
     @tbl_res_model.addColumn("#")
     @tbl_res_model.addColumn("Blocked")
@@ -777,7 +798,7 @@ end
     
     paydir = File.expand_path(File.dirname(__FILE__)) + "/payloads/"
     @wordlist = {}
-    Dir.glob(paydir+ "*.lsd") do |p|
+    Dir.glob(paydir+ "*.lsd").sort().each do |p|
       #JOptionPane.showMessageDialog(nil, p)
       COUT("initWordlists => Adding file: " + p.to_s)
       #if File.extname(p) == ".lsd" then
@@ -867,6 +888,8 @@ end
       File.open(v, "rb").each do |l|
         l = l.chomp
         next if l.empty?
+        next if l.include? "###"
+        
         fsize = fsize + 1
         
         @monsters[n] = MonsterState.new
@@ -1178,4 +1201,3 @@ end
     ## TODO: Nothing, yet!
   end
 end
-

