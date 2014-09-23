@@ -1,9 +1,10 @@
-What the WAF is wrong with you, man?!
+Is there a WAF? Go terrorize it!  
+-- A Burp 1.6 Extension
 
-#Info
+#Test Environment
 jruby-complete.jar Version: 1.7.15  
 local jruby version: 1.5.6  
-OS: Debian Jessie (powered by both Debian Testing and Kali-Bleeding-Edge repos)  
+OS: Debian Jessie  
 
 #Installation
 Download jruby-complete jar file from [JRuby](http://www.jruby.org/download)  
