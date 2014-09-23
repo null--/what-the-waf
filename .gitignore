@@ -12,6 +12,7 @@ portswigger/*
 ######################
 *~
 *.#*
+geany_run_script.sh
 
 # OS generated files #
 ######################

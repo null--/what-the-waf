@@ -5,15 +5,11 @@
 # source code (GPLv3) is available at github: https://github.com/null--/what-the-waf    #
 #                                                                                       #
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
-## TODO A handy panel to bypass WAF (after detection WAF weaknesses)
+## TODO A handy panel to bypass WAF (after WAF weaknesses was discloused)
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
-VERSION         = "1.1 (beta)"
+VERSION         = "1.2 (beta)"
 DEBUG           = true
-
-# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
-$_BURP_STD_OUT_  = nil
-$_BURP_STD_ERR_  = nil
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
 WTW_ACT_NAME    = "What The WAF?!"
@@ -85,17 +81,17 @@ java_import 'burp.ISessionHandlingAction'
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
 def COUT(str)
-  return if $_BURP_STD_OUT_.nil?
-  return if not DEBUG
+  return if BurpExtender._BURP_STD_OUT_.nil?
+  return unless DEBUG
   
-  $_BURP_STD_OUT_.println(str)
+  BurpExtender._BURP_STD_OUT_.println(str)
 end
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
 def CERR(str)
-  return if $_BURP_STD_ERR_.nil?
+  return if BurpExtender._BURP_STD_ERR_.nil?
   
-  $_BURP_STD_ERR_.println(str)
+  BurpExtender._BURP_STD_ERR_.println(str)
 end
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
@@ -285,7 +281,7 @@ class PayGen
   def getNextPayload(baseValue)    
     while not @parent.monsters[@cur_pos].allow do
       # JOptionPane.showMessageDialog(nil, "Not allowed: " + @cur_pos.to_s + ": " + @allow[@cur_pos].to_s)
-      @parent.stdout.println("Stucked for " + (@cur_pos).to_s)
+      COUT("Stucked for " + (@cur_pos).to_s)
       sleep(0.1)
     end
     
@@ -302,8 +298,8 @@ class PayGen
     @cur_pos = 0
     @parent.loadEmAll
     
-    @parent.monsters[0].allow = true
-    @parent.monsters[1].allow = true
+    @parent.monsters[0].allow = true unless @parent.monsters[0].nil?
+    # @parent.monsters[1].allow = true unless @parent.monsters[1].nil?
   end
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
@@ -313,8 +309,8 @@ class PayGen
   
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
   def allowNext
-    @parent.stdout.println("Allowing " + (@cur_pos+1).to_s)
-    @parent.monsters[@cur_pos].allow = true
+    COUT("Allowing " + (@cur_pos+1).to_s)
+    @parent.monsters[@cur_pos].allow = true if hasMorePayloads
   end
 end
 
@@ -327,6 +323,17 @@ class BurpExtender
   include IIntruderAttack, IIntruderPayloadGeneratorFactory, IIntruderPayloadProcessor
   include ITab
 
+
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
+  @@_BURP_STD_OUT_  = nil
+  def self._BURP_STD_OUT_
+    @@_BURP_STD_OUT_
+  end
+  @@_BURP_STD_ERR_  = nil
+  def self._BURP_STD_ERR_
+    @@_BURP_STD_ERR_
+  end
+  
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
   attr_accessor :burp
   
@@ -343,6 +350,7 @@ class BurpExtender
   def registerExtenderCallbacks(_burp)
     @monsters = []
     @table_monster_map = []
+    @wordlist_pre = {}
     
     @intruder = nil
     
@@ -356,8 +364,9 @@ class BurpExtender
     @burp.registerIntruderPayloadProcessor(self)
     @burp.registerHttpListener(self)
     @burp.registerExtensionStateListener(self)
-    $_BURP_STD_OUT_ = java.io.PrintWriter.new(@burp.getStdout(), true)
-    $_BURP_STD_ERR_ = java.io.PrintWriter.new(@burp.getStderr(), true)
+    
+    _BURP_STD_OUT_ = java.io.PrintWriter.new(@burp.getStdout(), true) if _BURP_STD_OUT_.nil?
+    _BURP_STD_ERR_ = java.io.PrintWriter.new(@burp.getStderr(), true) if _BURP_STD_ERR_.nil?
     
     # gui
     # # tabs
@@ -529,11 +538,23 @@ end
     @pan_pay.setLayout(@lay_pay)
     @pan_pay.setBorder(BorderFactory.createMatteBorder(0,0,2,0, Color.orange))
     lbl_pay = JLabel.new("<html><h3>Payload Options</h3></html>")
-    lbl_sel = JLabel.new("<html><b>Wordlist</b><br><i>Note: Selected wordlist files will be reloaded, each time you start the attack\"</i></html>")
+    lbl_sel = JLabel.new("<html><b>Wordlist</b><br>Select from left list then add to the right list<br>" + 
+      "<i>Note 1: There is no select all button because it's not an option!<br>" + 
+      "Note 2: Selected wordlist files will be reloaded, each time you start the attack</i></html>")
+    
     @lst_pay_model = DefaultListModel.new()
     @lst_pay = JList.new(@lst_pay_model)
     @lst_pay.setSelectionMode(ListSelectionModel::SINGLE_SELECTION)
     @lst_pay_scr = JScrollPane.new(@lst_pay)
+    
+    @lst_pay_model_pre = DefaultListModel.new()
+    @lst_pay_pre = JList.new(@lst_pay_model_pre)
+    @lst_pay_pre.setSelectionMode(ListSelectionModel::SINGLE_SELECTION)
+    @lst_pay_scr_pre = JScrollPane.new(@lst_pay_pre)
+    
+    @btn_insert = JButton.new("<html>&#92;<br>&#47;</html>")
+    @btn_remove = JButton.new("<html>&#47;<br>&#92;</html>")
+    
     lbl_pay_add = JLabel.new("<html><i>Add new wordlist (line-seperated list of paylaods)</i></html>")
     @btn_pay_add = JButton.new("Add")
     @btn_pay_rem = JButton.new("Remove")
@@ -559,7 +580,12 @@ end
       @lay_pay.createParallelGroup(GroupLayout::Alignment::LEADING
         ).addComponent(lbl_pay
         ).addComponent(lbl_sel
-        ).addComponent(@lst_pay_scr, 450, 450, 450
+        ).addGroup(@lay_pay.createSequentialGroup(
+          ).addComponent(@lst_pay_scr_pre, 300, 300, 300
+          ).addGroup(@lay_pay.createParallelGroup(GroupLayout::Alignment::CENTER
+            ).addComponent(@btn_insert, 50,50,50
+            ).addComponent(@btn_remove, 50,50,50)
+          ).addComponent(@lst_pay_scr, 300, 300, 300)
         ).addComponent(lbl_pay_add
         ).addGroup(@lay_pay.createSequentialGroup(
           ).addComponent(@btn_pay_add
@@ -585,7 +611,12 @@ end
       @lay_pay.createSequentialGroup(
         ).addComponent(lbl_pay
         ).addComponent(lbl_sel
-        ).addComponent(@lst_pay_scr, 400, 400, 400
+        ).addGroup(@lay_pay.createParallelGroup(GroupLayout::Alignment::CENTER
+          ).addComponent(@lst_pay_scr_pre, 300, 300, 300
+          ).addGroup(@lay_pay.createSequentialGroup(
+            ).addComponent(@btn_insert
+            ).addComponent(@btn_remove)
+          ).addComponent(@lst_pay_scr, 300, 300, 300)
         ).addComponent(lbl_pay_add
         ).addGroup(@lay_pay.createParallelGroup(GroupLayout::Alignment::BASELINE
           ).addComponent(@btn_pay_add
@@ -677,6 +708,13 @@ end
     @btn_pay_def.addActionListener do |e|
       initWordlists
     end
+    
+    @btn_insert.addActionListener do |e|
+      selectWordlist(e)
+    end
+    @btn_remove.addActionListener do |e|
+      unselectWordlist(e)
+    end
   end
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
@@ -743,8 +781,8 @@ end
       #JOptionPane.showMessageDialog(nil, p)
       COUT("initWordlists => Adding file: " + p.to_s)
       #if File.extname(p) == ".lsd" then
-        @wordlist[File.basename(p, ".*")] = p.to_s
-        @lst_pay_model.addElement(File.basename(p, ".*"))
+        @wordlist_pre[File.basename(p, ".*")] = p.to_s
+        @lst_pay_model_pre.addElement(File.basename(p, ".*"))
       #end
     end
   end
@@ -756,28 +794,53 @@ end
     
     if fc.showOpenDialog(@tabs) == JFileChooser::APPROVE_OPTION then
       p = fc.getSelectedFile().to_s
-      # TODO: Check for duplicates
-      @wordlist[File.basename(p, ".*")] = p
-      @lst_pay_model.addElement(File.basename(p, ".*"))
+      @wordlist_pre[File.basename(p, ".*")] = p
+      @lst_pay_model_pre.addElement(File.basename(p, ".*"))
     end
   end
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
   def removeWordlist(e)
-    i = @lst_pay.getSelectedIndex()
-    n = @lst_pay_model.getElementAt(i).to_s
+    i = @lst_pay_pre.getSelectedIndex()
+    n = @lst_pay_model_pre.getElementAt(i).to_s
     if (i != -1) and (@wordlist.has_key? n) then
-        @wordlist.delete(n)
-        @lst_pay_model.remove(i)
+        @wordlist_pre.delete(n)
+        @lst_pay_model_pre.remove(i)
     end
   end
   
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
   def clearWordlists(e = nil)
     @wordlist.clear unless @wordlist.nil?
+    @wordlist_pre.clear unless @wordlist_pre.nil?
+    @lst_pay_model_pre.removeAllElements() unless @lst_pay_model_pre.nil?
     @lst_pay_model.removeAllElements() unless @lst_pay_model.nil?
   end
 
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
+  def selectWordlist(e)
+    i = @lst_pay_pre.getSelectedIndex()
+    n = @lst_pay_model_pre.getElementAt(i).to_s
+    if (i != -1) then
+        @lst_pay_model_pre.remove(i)
+        @lst_pay_model.addElement(n)
+        @wordlist[n] = @wordlist_pre[n]
+        @wordlist_pre.delete(n)
+    end
+  end
+
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
+  def unselectWordlist(e)
+    i = @lst_pay.getSelectedIndex()
+    n = @lst_pay_model.getElementAt(i).to_s
+    if (i != -1) then
+        @lst_pay_model.remove(i)
+        @lst_pay_model_pre.addElement(n)
+        @wordlist_pre[n] = @wordlist[n]
+        @wordlist.delete(n)
+    end
+  end
+  
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
   def loadEmAll
     @total_index = 0
@@ -797,6 +860,7 @@ end
     
     # JOptionPane.showMessageDialog(nil, "Half Done ...")
     @monsters.clear
+    
     n = 0
     @wordlist.each do |k,v|
       fsize = 0
@@ -810,7 +874,7 @@ end
         @monsters[n].wordlist = k
         n = n + 1
       end
-      COUT("Loading: " + v + " - Size: " + fsize.to_s)
+      COUT("Loaded: " + v + " - Size: " + fsize.to_s)
     end
     
     @timeout = @txt_timeout.getText().to_s.to_i
@@ -998,7 +1062,7 @@ end
   def processHttpMessage(toolFlag, messageIsRequest, messageInfo)
     return unless toolFlag == 0x20 # DUMMY!    
     ## TODO: Test logical flow
-    if messageIsRequest and not @pg.nil? then
+    if messageIsRequest and not @pg.nil? and @pg.lastPos >= 0 then
       COUT("Preparing the monster")
       
       @monsters[@pg.lastPos].setTime
@@ -1006,6 +1070,8 @@ end
       @monsters[@pg.lastPos].service = messageInfo.getHttpService()
       
       messageInfo.setComment("Touched by WTW, id=" + @monsters[@pg.lastPos].id)
+      COUT "Monster #" + @monsters[@pg.lastPos].id + " is unleashed!"
+      
       @pg.allowNext
     elsif not messageIsRequest and not @pg.nil? then
       pos = findMonster(messageInfo)

