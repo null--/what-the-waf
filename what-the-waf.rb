@@ -410,7 +410,7 @@ class BurpExtender
     lbl_body = JLabel.new(
     "<html><h4>About</h4><hr><p>version: " + VERSION + 
     "<i><br>by _null_ (Sina Hatef)" + 
-    "<br>Project Link: <a href=\"https://github.com/null--/what-the-waf\">" + 
+    "<br>Get the latest version from: <a href=\"https://github.com/null--/what-the-waf\">" + 
     "https://github.com/null--/what-the-waf</a></i></p>" + 
     "<p><h4>How to use</h4><hr>" + 
     "1. This extension works beside the Intruder, so send your target request to the Intruder " + 
@@ -755,7 +755,9 @@ end
     @pan_res.setLayout(@lay_res)
     container.add(@pan_res, BorderLayout::CENTER)
     
-    lbl_passed = JLabel.new("<html><i>1. To \"Save\" HTTP request/responses use the \"Save\" menu inside \"Intruder Attack\" window." + 
+    lbl_passed = JLabel.new(
+        "<html><i>1. If you want to \"Save\" HTTP request/responses," + 
+        " you can use the \"Save\" menu inside \"Intruder Attack\" window.<br>" + 
         "2. You can select a row then press Ctrl+C to copy " +
         "its content or right-click on it and choose \"Send to repeater\"</i></html>")
     @tbl_res_model = MyTableModel.new()
