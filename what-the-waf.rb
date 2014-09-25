@@ -8,7 +8,7 @@
 ## TODO A handy panel to bypass WAF (after WAF weaknesses was discloused)
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
-VERSION         = "1.2 (beta)"
+VERSION         = "1.3 (beta)"
 DEBUG           = true
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
@@ -406,13 +406,13 @@ class BurpExtender
     @pan_info.setLayout(@lay_info)
     @pan_info.setBorder(BorderFactory.createMatteBorder(0,0,2,0, Color.orange))
     
-    lbl_head = JLabel.new("<html><h3>README</h3></html>")
+    lbl_head = JLabel.new("<html><h3>README</h3><hr></html>")
     lbl_body = JLabel.new(
-    "<html><h4>About</h4><p>version: " + VERSION + 
+    "<html><h4>About</h4><hr><p>version: " + VERSION + 
     "<i><br>by _null_ (Sina Hatef)" + 
     "<br>Project Link: <a href=\"https://github.com/null--/what-the-waf\">" + 
     "https://github.com/null--/what-the-waf</a></i></p>" + 
-    "<p><h4>How to use</h4>" + 
+    "<p><h4>How to use</h4><hr>" + 
     "1. This extension works beside the Intruder, so send your target request to the Intruder " + 
     "and select your parameters as you always do.<br>" + 
     "2. Under the \"Payloads\" tab select the \"Payload type\" to <b>\"Extension-generated\"</b><br>" + 
@@ -421,10 +421,13 @@ class BurpExtender
     "4. Under the \"Payload Processing\" click \"add\" then select <b>\"Invoke Burp Extension\"" +
     "</b> and choose \"What The WAF?!\" as your processor.<br>" + 
     "5. Start Attack.</p>" + 
-    "<p><h4>Note</h4>" + 
+    "<p><h4>Note</h4><hr>" + 
     "1.On the \"Resuls\" tab you can select a row then right-click on it and choose" + 
-    "\"Send to repeater\"</p>" + 
-    "<h4>Important Notes</h4>" + 
+    "\"Send to repeater\"<br>" + 
+    "2. For advanced usage you may consider, setting \"Throttle\" and/or " + 
+    "\"Number of Threads\" optoins inside \"Intruder\" tab." + 
+    "<br>(These two options are very useful against Fortiweb or mod_security.</p>" + 
+    "<h4>Important Notes</h4><hr>" + 
     "<p>1. Current version does not support simultaneous Intruder attacks.<br>" + 
     "2. Scan one parameter at a time (<b>single param</b> + sniper mode)</p></html>")
     
@@ -474,7 +477,8 @@ end
     @lay_waf.setAutoCreateContainerGaps(true)
     @pan_waf.setLayout(@lay_waf)
     @pan_waf.setBorder(BorderFactory.createMatteBorder(0,0,2,0, Color.orange))
-    lbl_waf = JLabel.new("<html><p>ALWAYS SAVE YOUR BURP STATE, BEFORE DOING SOMETHING NASTY!</p><h3>WAF Options</h3></html>")
+    lbl_hot = JLabel.new("<html><b><u>ALWAYS SAVE YOUR BURP'S STATE, BEFORE DOING SOMETHING NASTY!</u></b></html>")
+    lbl_waf = JLabel.new("<html><h3>WAF Options</h3><hr><br></html>")
     
     lbl_hcode = JLabel.new("<html><b>WAF HTTP Response CODE</b><br><i>HTTP response code(s) used by WAF to block malicious requests</i></html>")
     @chk = {}
@@ -498,7 +502,7 @@ end
     lbl_block_url = JLabel.new("Block/Redirection URL (the \"Location\" Header Field):")
     @txt_block_url = JTextField.new()
     lbl_timeout = JLabel.new("Block timeout (seconds):")
-    @txt_timeout = JTextField.new()
+    @txt_timeout = JTextField.new("0")
     lbl_timeout_info = JLabel.new("<html><i>The connection timeout value used by WAF to block a malicious client.</i><b> (EXPERIMENTAL)</b></html>")
     lbl_body = JLabel.new("Find in body (REGEX):")
     @txt_body = JTextField.new()
@@ -508,6 +512,7 @@ end
     
     @lay_waf.setHorizontalGroup(
       @lay_waf.createParallelGroup(GroupLayout::Alignment::LEADING
+        ).addComponent(lbl_hot
         ).addComponent(lbl_waf
         ).addComponent(lbl_hcode
         ).addComponent(pan_code
@@ -530,6 +535,7 @@ end
     
     @lay_waf.setVerticalGroup(
       @lay_waf.createSequentialGroup(
+        ).addComponent(lbl_hot
         ).addComponent(lbl_waf
         ).addComponent(lbl_hcode
         ).addComponent(pan_code
@@ -557,7 +563,7 @@ end
     @lay_pay.setAutoCreateContainerGaps(true)
     @pan_pay.setLayout(@lay_pay)
     @pan_pay.setBorder(BorderFactory.createMatteBorder(0,0,2,0, Color.orange))
-    lbl_pay = JLabel.new("<html><h3>Payload Options</h3></html>")
+    lbl_pay = JLabel.new("<html><h3>Payload Options</h3><hr></html>")
     lbl_sel = JLabel.new("<html><b>Wordlist</b><br>Select from left list then add to the right list<br>" + 
       "<i>Note 1: There is no select all button because it's not an option!<br>" + 
       "Note 2: Selected wordlist files will be reloaded, each time you start the attack</i></html>")
@@ -665,7 +671,7 @@ end
     @lay_scan.setAutoCreateContainerGaps(true)
     @pan_scan.setLayout(@lay_scan)
     @pan_scan.setBorder(BorderFactory.createMatteBorder(0,0,2,0, Color.orange))
-    lbl_scan = JLabel.new("<html><h3>Scan Options</h3></html>")
+    lbl_scan = JLabel.new("<html><h3>Scan Options</h3><hr></html>")
     @chk_encode = JCheckBox.new("Apply URL-encoding on payloads", false)
     lbl_scan_cont = JLabel.new("<html><b>Content Settings</b></html>")
     @txt_delay = JTextField.new("0")
@@ -749,7 +755,8 @@ end
     @pan_res.setLayout(@lay_res)
     container.add(@pan_res, BorderLayout::CENTER)
     
-    lbl_passed = JLabel.new("<html><i>You can select a row then press Ctrl+C to copy" +
+    lbl_passed = JLabel.new("<html><i>1. To \"Save\" HTTP request/responses use the \"Save\" menu inside \"Intruder Attack\" window." + 
+        "2. You can select a row then press Ctrl+C to copy " +
         "its content or right-click on it and choose \"Send to repeater\"</i></html>")
     @tbl_res_model = MyTableModel.new()
     @tbl_res_model.addColumn("#")
@@ -766,23 +773,27 @@ end
     @tbl_res.setFillsViewportHeight(true);
     @tbl_res.setSelectionMode(ListSelectionModel::SINGLE_SELECTION)
     @tbl_res.getColumnModel().getColumn(0).setPreferredWidth(50)
-    @tbl_res.getColumnModel().getColumn(1).setPreferredWidth(20)
-    @tbl_res.getColumnModel().getColumn(1).setPreferredWidth(100)
-    @tbl_res.getColumnModel().getColumn(2).setPreferredWidth(300)
-    @tbl_res.getColumnModel().getColumn(3).setPreferredWidth(300)
-    @tbl_res.getColumnModel().getColumn(4).setPreferredWidth(500)
+    @tbl_res.getColumnModel().getColumn(1).setPreferredWidth(70)
+    @tbl_res.getColumnModel().getColumn(2).setPreferredWidth(200)
+    @tbl_res.getColumnModel().getColumn(3).setPreferredWidth(200)
+    @tbl_res.getColumnModel().getColumn(4).setPreferredWidth(300)
+    @tbl_res.getColumnModel().getColumn(5).setPreferredWidth(500)
     @tbl_res.setAutoResizeMode(JTable::AUTO_RESIZE_OFF)    
     
     scroll_tbl = JScrollPane.new(@tbl_res)
     
+    @btn_save = JButton.new("Save Results (tab-seperated file)")
+    
     @lay_res.setHorizontalGroup(
       @lay_res.createParallelGroup(GroupLayout::Alignment::LEADING
+        ).addComponent(@btn_save
         ).addComponent(lbl_passed
         ).addComponent(scroll_tbl)
     )
     
     @lay_res.setVerticalGroup(
       @lay_res.createSequentialGroup(
+        ).addComponent(@btn_save
         ).addComponent(lbl_passed
         ).addComponent(scroll_tbl)
     )
@@ -790,6 +801,10 @@ end
     @mouse_handler = ResultMouse.new
     @mouse_handler.createMenu(self)
     @tbl_res.addMouseListener( @mouse_handler )
+    
+    @btn_save.addActionListener do |e|
+      saveResult(e)
+    end
   end
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
@@ -859,6 +874,29 @@ end
         @lst_pay_model_pre.addElement(n)
         @wordlist_pre[n] = @wordlist[n]
         @wordlist.delete(n)
+    end
+  end
+
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
+  def saveResult(e)
+    fc = JFileChooser.new()
+    
+    if fc.showSaveDialog(@tabs) == JFileChooser::APPROVE_OPTION then
+      p = fc.getSelectedFile().to_s
+      
+      File.open(p, "w+") do |f|
+        0.upto(3) do |i|
+          f << @tbl_res.getColumnName(i).to_s << "\t"
+        end
+        f << "\n"
+        
+        0.upto(@tbl_res.getRowCount().to_i) do |i|
+          0.upto(3) do |j|
+            f << @tbl_res.getValueAt(i, j) << "\t"
+          end
+          f << "\n"
+        end
+      end
     end
   end
   
@@ -978,6 +1016,7 @@ end
       pos = 0
       @monsters.each do |m|
         next if m.processed
+        next if m.request.nil?
         
         diff = m.age
         if diff > @timeout then
@@ -1182,9 +1221,10 @@ end
       end
       
       @monsters[ pos ].processed = true
+      
+      ## TODO: Wrong place, Buggy!
+      detectTimeouts unless @pg.nil? or @pg.hasMorePayloads
     end
-    
-    detectTimeouts
   end
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #  
