@@ -23,7 +23,7 @@ Click "Select File" and choose "\[foo\]/\[bar\]/what-the-waf.rb"
 WTW 101  
 
 ### example/Fortiweb
-Configure Burp and WTW to pentest a FortiWeb (real-world case-study)  
+Configure Burp and WTW to pentest a FortiWeb WAF (real-world case-study)  
 
 ### example/Chart
 How to draw a chart from a saved result  
