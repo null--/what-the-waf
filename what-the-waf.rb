@@ -410,8 +410,9 @@ class BurpExtender
     lbl_body = JLabel.new(
     "<html><h4>About</h4><hr><p>version: " + VERSION + 
     "<i><br>by _null_ (Sina Hatef)" + 
-    "<br>Get the latest version from: <a href=\"https://github.com/null--/what-the-waf\">" + 
-    "https://github.com/null--/what-the-waf</a></i></p>" + 
+    "<br>Get the latest version from: <a href='https://github.com/null--/what-the-waf'>" + 
+    "https://github.com/null--/what-the-waf</a></i>" + 
+    "</p>" + 
     "<p><h4>How to use</h4><hr>" + 
     "1. This extension works beside the Intruder, so send your target request to the Intruder " + 
     "and select your parameters as you always do.<br>" + 
