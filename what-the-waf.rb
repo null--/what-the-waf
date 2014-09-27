@@ -422,14 +422,17 @@ class BurpExtender
     "</b> and choose \"What The WAF?!\" as your processor.<br>" + 
     "5. Start Attack.</p>" + 
     "<p><h4>Note</h4><hr>" + 
-    "1.On the \"Resuls\" tab you can select a row then right-click on it and choose" + 
+    "1.On the \"Resuls\" tab you can select a row then right-click on it and choose " + 
     "\"Send to repeater\"<br>" + 
-    "2. For advanced usage you may consider, setting \"Throttle\" and/or " + 
+    "2. For advanced usage you may consider setting \"Throttle\" and/or " + 
     "\"Number of Threads\" optoins inside \"Intruder\" tab." + 
-    "<br>(These two options are very useful against Fortiweb or mod_security.</p>" + 
+    "<br>(These two options are very useful against Advanced WAFs.<br>" + 
+    "3. Examples are available at  <a href=\"https://github.com/null--/what-the-waf/tree/master/examples\">" + 
+    "https://github.com/null--/what-the-waf/tree/master/examples</a>." + 
+    "</p>" + 
     "<h4>Important Notes</h4><hr>" + 
     "<p>1. Current version does not support simultaneous Intruder attacks.<br>" + 
-    "2. Scan one parameter at a time (<b>single param</b> + sniper mode)</p></html>")
+    "2. Scan one parameter at a time (<b>single param</b> + <b>sniper mode</b>)</p></html>")
     
     txt_shit = JTextField.new()
     
@@ -508,7 +511,7 @@ end
     @txt_body = JTextField.new()
     lbl_len = JLabel.new("Length: ")
     @txt_len = JTextField.new("0")
-    lbl_len_info = JLabel.new("<html><i>In case of pentesting mod_security or Fortiweb, this option will become very useful<br>Please, notice that if you set length to be 0 then this will ignore checking response size.</i></html>")
+    lbl_len_info = JLabel.new("<html><i>Use this option when WAF uses a static error page.<br>Please, notice that if you set length to be 0 then \"WTW\" will ignore checking response size.</i></html>")
     
     @lay_waf.setHorizontalGroup(
       @lay_waf.createParallelGroup(GroupLayout::Alignment::LEADING
@@ -563,8 +566,8 @@ end
     @lay_pay.setAutoCreateContainerGaps(true)
     @pan_pay.setLayout(@lay_pay)
     @pan_pay.setBorder(BorderFactory.createMatteBorder(0,0,2,0, Color.orange))
-    lbl_pay = JLabel.new("<html><h3>Payload Options</h3><hr></html>")
-    lbl_sel = JLabel.new("<html><b>Wordlist</b><br>Select from left list then add to the right list<br>" + 
+    lbl_pay = JLabel.new("<html><h3>Payload and Wordlist Options</h3><hr></html>")
+    lbl_sel = JLabel.new("<html><b>Wordlist</b>" + 
       "<i>Note 1: There is no select all button because it's not an option!<br>" + 
       "Note 2: Selected wordlist files will be reloaded, each time you start the attack</i></html>")
     
@@ -577,6 +580,9 @@ end
     @lst_pay_pre = JList.new(@lst_pay_model_pre)
     @lst_pay_pre.setSelectionMode(ListSelectionModel::SINGLE_SELECTION)
     @lst_pay_scr_pre = JScrollPane.new(@lst_pay_pre)
+    
+    lbl_pre = JLabel.new("<html><b>Available Wordlists</b></html>")
+    lbl_post = JLabel.new("<html><b>Selected Wordlists</b></html>")
     
     @btn_insert = JButton.new("<html>&#92;<br>&#47;</html>")
     @btn_remove = JButton.new("<html>&#47;<br>&#92;</html>")
@@ -607,11 +613,16 @@ end
         ).addComponent(lbl_pay
         ).addComponent(lbl_sel
         ).addGroup(@lay_pay.createSequentialGroup(
-          ).addComponent(@lst_pay_scr_pre, 300, 300, 300
+          ).addGroup(@lay_pay.createParallelGroup(GroupLayout::Alignment::LEADING
+            ).addComponent(lbl_pre, 200, 200, 200
+            ).addComponent(@lst_pay_scr_pre, 300, 300, 300)
           ).addGroup(@lay_pay.createParallelGroup(GroupLayout::Alignment::CENTER
             ).addComponent(@btn_insert, 50,50,50
             ).addComponent(@btn_remove, 50,50,50)
-          ).addComponent(@lst_pay_scr, 300, 300, 300)
+          ).addGroup(@lay_pay.createParallelGroup(GroupLayout::Alignment::LEADING
+            ).addComponent(lbl_post, 200, 200, 200
+            ).addComponent(@lst_pay_scr, 300, 300, 300)
+          )
         ).addComponent(lbl_pay_add
         ).addGroup(@lay_pay.createSequentialGroup(
           ).addComponent(@btn_pay_add
@@ -638,11 +649,16 @@ end
         ).addComponent(lbl_pay
         ).addComponent(lbl_sel
         ).addGroup(@lay_pay.createParallelGroup(GroupLayout::Alignment::CENTER
-          ).addComponent(@lst_pay_scr_pre, 300, 300, 300
+          ).addGroup(@lay_pay.createSequentialGroup(
+            ).addComponent(lbl_pre
+            ).addComponent(@lst_pay_scr_pre, 300, 300, 300)
           ).addGroup(@lay_pay.createSequentialGroup(
             ).addComponent(@btn_insert
             ).addComponent(@btn_remove)
-          ).addComponent(@lst_pay_scr, 300, 300, 300)
+          ).addGroup(@lay_pay.createSequentialGroup(
+            ).addComponent(lbl_post
+            ).addComponent(@lst_pay_scr, 300, 300, 300)
+          )
         ).addComponent(lbl_pay_add
         ).addGroup(@lay_pay.createParallelGroup(GroupLayout::Alignment::BASELINE
           ).addComponent(@btn_pay_add
