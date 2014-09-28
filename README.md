@@ -1,5 +1,5 @@
-Find a way to bypass that bloody WAF.
-A Burp 1.6+ Extension  
+Find a way to bypass that bloody WAF.  
+-- A Burp 1.6+ Extension  
 
 #A WAF Story
 ###In WAF we trust
@@ -24,10 +24,10 @@ Blackhat (looking at Lisa): And nice WAFing tits, by the way!
 
 #Installation
 Download jruby-complete jar file from [JRuby](http://www.jruby.org/download)  
-Open the "Burp Suite"  
+Open your "Burp Suite"  
 Go to "Extender"  
 Go to "Options"  
-On "Ruby Environment" section set the "Location of JRuby JAR file" to   "\[foo\]/\[bar\]/jruby-complete-\[version\].jar"  
+On "Ruby Environment" section set "Location of JRuby JAR file" to "\[foo\]/\[bar\]/jruby-complete-\[version\].jar"  
 Go to "Extensions"  
 Click on "Add"  
 Set "Extension Type" to "Ruby"  

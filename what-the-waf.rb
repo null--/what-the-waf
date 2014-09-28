@@ -5,11 +5,16 @@
 # source code (GPLv3) is available at github: https://github.com/null--/what-the-waf    #
 #                                                                                       #
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
-## TODO A handy panel to bypass WAF (after WAF weaknesses was discloused)
+# TODO                                                                                  #
+#   More informative error messages!                                                    #
+#   Better exception handling                                                           #
+#   TODO A handy panel to bypass WAF (after WAF weaknesses was discloused)              #
+# -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
-VERSION         = "1.3 (beta)"
+VERSION         = "1.4 (beta)"
 DEBUG           = true
+WORDLIST_DIR    = "wtw-repo/"
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
 WTW_ACT_NAME    = "What The WAF?!"
@@ -414,13 +419,13 @@ class BurpExtender
     "https://github.com/null--/what-the-waf</a></i>" + 
     "</p>" + 
     "<p><h4>How to use</h4><hr>" + 
-    "1. This extension works beside the Intruder, so send your target request to the Intruder " + 
-    "and select your parameters as you always do.<br>" + 
-    "2. Under the \"Payloads\" tab select the \"Payload type\" to <b>\"Extension-generated\"</b><br>" + 
-    "3. Under the \"Payload Options\" section, click on the \"select generator\" button and" + 
+    "1. This extension works beside Intruder, so send your target request to the Intruder " + 
+    "and select your target parameter as you always do.<br>" + 
+    "2. Goto \"Intruder\" tab then under \"Payloads\" tab select the \"Payload type\" to <b>\"Extension-generated\"</b><br>" + 
+    "3. Under \"Payload Options\" section, click on \"select generator\" button and" + 
     "choose \"What the WAF?!\".<br>" + 
-    "4. Under the \"Payload Processing\" click \"add\" then select <b>\"Invoke Burp Extension\"" +
-    "</b> and choose \"What The WAF?!\" as your processor.<br>" + 
+    "4. Under \"Payload Processing\" click \"add\" then select <b>\"Invoke Burp Extension\"" +
+    "</b> and choose \"What The WAF?!\" as your paylaod processor. <br>" + 
     "5. Start Attack.</p>" + 
     "<p><h4>Note</h4><hr>" + 
     "1.On the \"Resuls\" tab you can select a row then right-click on it and choose " + 
@@ -481,12 +486,12 @@ end
     @lay_waf.setAutoCreateContainerGaps(true)
     @pan_waf.setLayout(@lay_waf)
     @pan_waf.setBorder(BorderFactory.createMatteBorder(0,0,2,0, Color.orange))
-    lbl_hot = JLabel.new("<html><b><u>ALWAYS SAVE YOUR BURP'S STATE, BEFORE DOING SOMETHING NASTY!</u></b></html>")
+    lbl_hot = JLabel.new("<html><p><b>Save</b> your current <b>bloody burp's state</b> before doing something <b>nasty</b>!</p></html>")
     lbl_waf = JLabel.new("<html><h3>WAF Options</h3><hr><br></html>")
     
-    lbl_hcode = JLabel.new("<html><b>WAF HTTP Response CODE</b><br><i>HTTP response code(s) used by WAF to block malicious requests</i></html>")
+    lbl_hcode = JLabel.new("<html><b>WAF HTTP Response Code</b><br><i>HTTP response code(s) used by WAF in response to a malicious request</i></html>")
     @chk = {}
-    @chk["200"] = JCheckBox.new("<html>200: OK (WAF was configured to show a <i>\"block\" page</i> <b>directly</b>)</html>")
+    @chk["200"] = JCheckBox.new("<html>200: OK <i>(use this carefully)</i></html>")
     @chk["301"] = JCheckBox.new("301: Moved Permanently")
     @chk["302"] = JCheckBox.new("302: Found", true)
     @chk["400"] = JCheckBox.new("400: Bad Request")
@@ -502,17 +507,16 @@ end
     @chk.each do |n,c|
       pan_code.add(c)
     end
-    lbl_red = JLabel.new("<html><b>WAF Block/Redirection URL</b><br><i>After being detected, Where does WAF redirect you?</i></html>")
-    lbl_block_url = JLabel.new("Block/Redirection URL (the \"Location\" Header Field):")
+    lbl_block_url = JLabel.new("<html><b>WAF Block/Redirection URL</b><br><i>After being detected, Where does WAF redirect you? (The value of \"Location:\" header)</i></html>")
     @txt_block_url = JTextField.new()
-    lbl_timeout = JLabel.new("Block timeout (seconds):")
+    lbl_timeout = JLabel.new("<html><b>Block timeout (seconds)</b></html>")
     @txt_timeout = JTextField.new("0")
     lbl_timeout_info = JLabel.new("<html><i>The connection timeout value used by WAF to block a malicious client.</i><b> (EXPERIMENTAL)</b></html>")
-    lbl_body = JLabel.new("Find in body (REGEX):")
+    lbl_body = JLabel.new("<html><b>Find in response body (REGEX)</b></html>")
     @txt_body = JTextField.new()
-    lbl_len = JLabel.new("Length: ")
+    lbl_len = JLabel.new("<html><b>Response length</b></html>")
     @txt_len = JTextField.new("0")
-    lbl_len_info = JLabel.new("<html><i>Use this option when WAF uses a static error page.<br>Please, notice that if you set length to be 0 then \"WTW\" will ignore checking response size.</i></html>")
+    lbl_len_info = JLabel.new("<html><i>0 = ignore response size</i></html>")
     
     @lay_waf.setHorizontalGroup(
       @lay_waf.createParallelGroup(GroupLayout::Alignment::LEADING
@@ -520,21 +524,16 @@ end
         ).addComponent(lbl_waf
         ).addComponent(lbl_hcode
         ).addComponent(pan_code
-        ).addComponent(lbl_red
-#        ).addGroup(@lay_waf.createSequentialGroup(
-          ).addComponent(lbl_block_url
-          ).addComponent(@txt_block_url, 300, 500, 600 #)
-#        ).addGroup(@lay_waf.createSequentialGroup(
-          ).addComponent(lbl_timeout
-          ).addComponent(@txt_timeout, 100, 100, 100 #)
+        ).addComponent(lbl_block_url
+        ).addComponent(@txt_block_url, 300, 500, 600 #)
+        ).addComponent(lbl_timeout
         ).addComponent(lbl_timeout_info
-#        ).addGroup(@lay_waf.createSequentialGroup(
-          ).addComponent(lbl_body
-          ).addComponent(@txt_body, 300, 500, 600 #)
-#        ).addGroup(@lay_waf.createSequentialGroup #(
-          ).addComponent(lbl_len
-          ).addComponent(@txt_len, 100, 100, 100 #)
-        ).addComponent(lbl_len_info)
+        ).addComponent(@txt_timeout, 100, 100, 100 #)
+        ).addComponent(lbl_body
+        ).addComponent(@txt_body, 300, 500, 600 #)
+        ).addComponent(lbl_len
+        ).addComponent(lbl_len_info
+        ).addComponent(@txt_len, 100, 100, 100)
     )
     
     @lay_waf.setVerticalGroup(
@@ -543,21 +542,16 @@ end
         ).addComponent(lbl_waf
         ).addComponent(lbl_hcode
         ).addComponent(pan_code
-        ).addComponent(lbl_red
-#        ).addGroup(@lay_waf.createParallelGroup(GroupLayout::Alignment::BASELINE
-          ).addComponent(lbl_block_url
-          ).addComponent(@txt_block_url #)
-#        ).addGroup(@lay_waf.createParallelGroup(GroupLayout::Alignment::BASELINE
-          ).addComponent(lbl_timeout
-          ).addComponent(@txt_timeout #)
+        ).addComponent(lbl_block_url
+        ).addComponent(@txt_block_url #)
+        ).addComponent(lbl_timeout
         ).addComponent(lbl_timeout_info
-#        ).addGroup(@lay_waf.createParallelGroup(GroupLayout::Alignment::BASELINE
-          ).addComponent(lbl_body
-          ).addComponent(@txt_body #)
-#        ).addGroup(@lay_waf.createParallelGroup(GroupLayout::Alignment::BASELINE
-          ).addComponent(lbl_len
-          ).addComponent(@txt_len #)
-        ).addComponent(lbl_len_info)
+        ).addComponent(@txt_timeout #)
+        ).addComponent(lbl_body
+        ).addComponent(@txt_body #)
+        ).addComponent(lbl_len
+        ).addComponent(lbl_len_info
+        ).addComponent(@txt_len)
     )
     
     # # PAYLOAD PANEL # #
@@ -568,8 +562,8 @@ end
     @pan_pay.setLayout(@lay_pay)
     @pan_pay.setBorder(BorderFactory.createMatteBorder(0,0,2,0, Color.orange))
     lbl_pay = JLabel.new("<html><h3>Payload and Wordlist Options</h3><hr></html>")
-    lbl_sel = JLabel.new("<html><b>Wordlist</b>" + 
-      "<i>Note 1: There is no select all button because it's not an option!<br>" + 
+    lbl_sel = JLabel.new("<html><h4>Wordlist</h4><hr><br>" + 
+      "<i>Note 1: There is no select-all button because it's not an option!<br>" + 
       "Note 2: Selected wordlist files will be reloaded, each time you start the attack</i></html>")
     
     @lst_pay_model = DefaultListModel.new()
@@ -593,17 +587,17 @@ end
     @btn_pay_rem = JButton.new("Remove")
     @btn_pay_cls = JButton.new("Clear")
     @btn_pay_def = JButton.new("Default")
-    lbl_cont = JLabel.new("<html><br><b>Payload Factory</b></html>")
-    lbl_pay_size = JLabel.new("Payload size:")
+    lbl_cont = JLabel.new("<html><h4>Payload Factory</h4><hr></html>")
+    lbl_pay_size = JLabel.new("<html><b>Payload size</b></html>")
     @txt_pay_size = JTextField.new("0")
-    lbl_pay_size_info = JLabel.new("<html><i>'0' means: Do not add pattern<br></i></html>")
-    lbl_pay_pat = JLabel.new("Pattern:")
+    lbl_pay_size_info = JLabel.new("<html><i>'0' means: Dear WTW, Do not add \"junk bytes\"!<br></i></html>")
+    lbl_pay_pat = JLabel.new("<html><b>Junk bytes</b></html>")
     @txt_pay_pat = JTextField.new("")
-    lbl_pay_pat_info = JLabel.new("<html><i>If the payload length be less than the \"Minimum payload size\", this pattern will be used to increase the size of payload.<br></i></html>")
-    lbl_pat_grp = JLabel.new("<html><br><b>Prefix/Suffix</b></html>")
-    @rdo_pat_left = JRadioButton.new("Treat the pattern as prefix")
-    @rdo_pat_right = JRadioButton.new("Treat the pattern as suffix", true)
-    @rdo_pat_both = JRadioButton.new("Both!")
+    lbl_pay_pat_info = JLabel.new("<html><i>If the payload length be less than the \"Minimum payload size\", this \"junk bytes\" will be used to increase the size of payload.<br></i></html>")
+    lbl_pat_grp = JLabel.new("<html><b>Junk Bytes' Position</b></html>")
+    @rdo_pat_left = JRadioButton.new("Add \"junk bytes\" to left size of payload")
+    @rdo_pat_right = JRadioButton.new("Add \"junk bytes\" to left size of payload", true)
+    @rdo_pat_both = JRadioButton.new("Both")
     grp_pat = ButtonGroup.new()
     grp_pat.add(@rdo_pat_left)
     grp_pat.add(@rdo_pat_right)
@@ -631,14 +625,12 @@ end
           ).addComponent(@btn_pay_cls
           ).addComponent(@btn_pay_def)
         ).addComponent(lbl_cont
-#        ).addGroup(@lay_pay.createSequentialGroup(
-          ).addComponent(lbl_pay_size
-          ).addComponent(@txt_pay_size, 100, 100, 100 #)
+        ).addComponent(lbl_pay_size
         ).addComponent(lbl_pay_size_info
-#        ).addGroup(@lay_pay.createSequentialGroup(
-          ).addComponent(lbl_pay_pat
-          ).addComponent(@txt_pay_pat,300,300,300 #)
+        ).addComponent(@txt_pay_size, 100, 100, 100 #)
+        ).addComponent(lbl_pay_pat
         ).addComponent(lbl_pay_pat_info
+        ).addComponent(@txt_pay_pat,300,300,300 #)
         ).addComponent(lbl_pat_grp
         ).addComponent(@rdo_pat_left
         ).addComponent(@rdo_pat_right
@@ -667,14 +659,12 @@ end
           ).addComponent(@btn_pay_cls
           ).addComponent(@btn_pay_def)
         ).addComponent(lbl_cont
-#        ).addGroup(@lay_pay.createParallelGroup(GroupLayout::Alignment::BASELINE
-          ).addComponent(lbl_pay_size
-          ).addComponent(@txt_pay_size #)
+        ).addComponent(lbl_pay_size
         ).addComponent(lbl_pay_size_info
-#        ).addGroup(@lay_pay.createParallelGroup(GroupLayout::Alignment::BASELINE
-          ).addComponent(lbl_pay_pat
-          ).addComponent(@txt_pay_pat #)
+        ).addComponent(@txt_pay_size #)
+        ).addComponent(lbl_pay_pat
         ).addComponent(lbl_pay_pat_info
+        ).addComponent(@txt_pay_pat #)
         ).addComponent(lbl_pat_grp
         ).addComponent(@rdo_pat_left
         ).addComponent(@rdo_pat_right
@@ -773,7 +763,7 @@ end
     container.add(@pan_res, BorderLayout::CENTER)
     
     lbl_passed = JLabel.new(
-        "<html><i>1. If you want to \"Save\" HTTP request/responses," + 
+        "<html><i>1. If you want to save HTTP requests/responses," + 
         " you can use the \"Save\" menu inside \"Intruder Attack\" window.<br>" + 
         "2. You can select a row then press Ctrl+C to copy " +
         "its content or right-click on it and choose \"Send to repeater\"</i></html>")
@@ -830,15 +820,27 @@ end
   def initWordlists
     clearWordlists
     
-    paydir = File.expand_path(File.dirname(__FILE__)) + "/payloads/"
+    paydir = File.expand_path(File.dirname(__FILE__)) + "/#{WORDLIST_DIR}"
     @wordlist = {}
+    
+    no_file = true
     Dir.glob(paydir+ "*.lsd").sort().each do |p|
+      no_file = false
       #JOptionPane.showMessageDialog(nil, p)
       COUT("initWordlists => Adding file: " + p.to_s)
       #if File.extname(p) == ".lsd" then
         @wordlist_pre[File.basename(p, ".*")] = p.to_s
         @lst_pay_model_pre.addElement(File.basename(p, ".*"))
       #end
+    end
+    
+    if no_file then
+      JOptionPane.showMessageDialog(nil, 
+        "<html>Cannot find WTW's default wordlists (those goddamn .lsd files inside #{WORDLIST_DIR})<br>" + 
+        "Please copy #{WORDLIST_DIR}* to #{paydir}<br>and god bless you!<br>" +
+        "(WTW directory: <b>#{paydir}</b>)</html>",
+        "Goddamn it",
+        JOptionPane::WARNING_MESSAGE)
     end
   end
 
