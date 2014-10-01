@@ -24,6 +24,7 @@ Blackhat (looking at Lisa): And nice WAFing tits, by the way!
 
 #Installation
 Download jruby-complete jar file from [JRuby](http://www.jruby.org/download)  
+Copy "bapps/" to "<path>/<to>/<burp>/bapps/"
 Open your "Burp Suite"  
 Go to "Extender"  
 Go to "Options"  

@@ -14,7 +14,8 @@
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
 VERSION         = "1.4 (beta)"
 DEBUG           = true
-WORDLIST_DIR    = "wtw-repo/"
+APP_ID          = "5da470c526ea4661a82187ec3e0f94aa"
+WORDLIST_DIR    = "bapps/#{APP_ID}/wtw-repo/"
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
 WTW_ACT_NAME    = "What The WAF?!"
@@ -494,7 +495,7 @@ end
     @chk["200"] = JCheckBox.new("<html>200: OK <i>(use this carefully)</i></html>")
     @chk["301"] = JCheckBox.new("301: Moved Permanently")
     @chk["302"] = JCheckBox.new("302: Found", true)
-    @chk["400"] = JCheckBox.new("4000: Bad Request")
+    @chk["400"] = JCheckBox.new("400: Bad Request")
     @chk["401"] = JCheckBox.new("401: Unauthorized")
     @chk["403"] = JCheckBox.new("403: Forbidden")
     @chk["404"] = JCheckBox.new("404: Not Found")
@@ -563,7 +564,8 @@ end
     @pan_pay.setBorder(BorderFactory.createMatteBorder(0,0,2,0, Color.orange))
     lbl_pay = JLabel.new("<html><h3>Payload and Wordlist Options</h3><hr></html>")
     lbl_sel = JLabel.new("<html><h4>Wordlist</h4><hr><br>" + 
-      "<i>Wrodlist files will be reloaded everytime you start a new Intruder attack.</i></html>")
+      "<i>Wrodlist files will be reloaded everytime you start a new Intruder attack.<br>" + 
+      "There is no \"Select all\" button because it's not an option!</i></html>")
     
     @lst_pay_model = DefaultListModel.new()
     @lst_pay = JList.new(@lst_pay_model)
@@ -592,7 +594,7 @@ end
     lbl_pay_size_info = JLabel.new("<html><i>'0' = no \"Junk bytes\"!<br></i></html>")
     lbl_pay_pat = JLabel.new("<html><b>Junk bytes</b></html>")
     @txt_pay_pat = JTextField.new("")
-    lbl_pay_pat_info = JLabel.new("<html><i>If the payload length be less than the \"Minimum payload size\", this \"Junk bytes\" will be used to increase the size of payload.<br></i></html>")
+    lbl_pay_pat_info = JLabel.new("<html><i>If the payload length is less than the \"Minimum payload size\" then this \"Junk bytes\" will be used to increase the size of payload.<br></i></html>")
     lbl_pat_grp = JLabel.new("<html><b>Position of Junk Bytes</b></html>")
     @rdo_pat_left = JRadioButton.new("Add \"Junk bytes\" to left side of payload")
     @rdo_pat_right = JRadioButton.new("Add \"Junk bytes\" to right side of payload", true)
@@ -678,7 +680,7 @@ end
     @pan_scan.setLayout(@lay_scan)
     @pan_scan.setBorder(BorderFactory.createMatteBorder(0,0,2,0, Color.orange))
     lbl_scan = JLabel.new("<html><h3>Scan Options</h3><hr></html>")
-    @chk_encode = JCheckBox.new("Apply URL-encoding on payloads", false)
+    @chk_encode = JCheckBox.new("Force URL-encoding", false)
     lbl_scan_cont = JLabel.new("<html><b>Content Settings</b></html>")
     @txt_delay = JTextField.new("0")
     lbl_res_grp = JLabel.new("<html><b>Results</b></html>")
@@ -823,23 +825,29 @@ end
     @wordlist = {}
     
     no_file = true
-    Dir.glob(paydir+ "*.lsd").sort().each do |p|
-      no_file = false
-      #JOptionPane.showMessageDialog(nil, p)
-      COUT("initWordlists => Adding file: " + p.to_s)
-      #if File.extname(p) == ".lsd" then
-        @wordlist_pre[File.basename(p, ".*")] = p.to_s
-        @lst_pay_model_pre.addElement(File.basename(p, ".*"))
-      #end
-    end
-    
-    if no_file then
-      JOptionPane.showMessageDialog(nil, 
-        "<html>Cannot find WTW's default wordlists (those goddamn .lsd files inside #{WORDLIST_DIR})<br>" + 
-        "Please copy #{WORDLIST_DIR}* to #{paydir}<br>and god bless you!<br>" +
-        "(WTW directory: <b>#{paydir}</b>)</html>",
-        "Goddamn it",
-        JOptionPane::WARNING_MESSAGE)
+    try_it = 3
+    while no_file and try_it > 0 do
+      Dir.glob(paydir+ "*.lsd").sort().each do |p|
+        no_file = false
+        #JOptionPane.showMessageDialog(nil, p)
+        COUT("initWordlists => Adding file: " + p.to_s)
+        #if File.extname(p) == ".lsd" then
+          @wordlist_pre[File.basename(p, ".*")] = p.to_s
+          @lst_pay_model_pre.addElement(File.basename(p, ".*"))
+        #end
+      end
+      
+      if no_file then
+        JOptionPane.showMessageDialog(nil, 
+          "<html>Cannot find WTW's default wordlists (those .lsd files inside #{WORDLIST_DIR})<br>" + 
+          "Please copy #{WORDLIST_DIR}* to #{paydir}<br>" +
+          "(WTW directory: <b>#{paydir}</b>)<br>" + 
+          "Try again! (#{try_it})</html>",
+          "Warning...",
+          JOptionPane::WARNING_MESSAGE)
+      end
+      
+      try_it = try_it - 1
     end
   end
 
