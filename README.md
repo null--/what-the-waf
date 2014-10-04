@@ -1,5 +1,9 @@
-Find a way to bypass that bloody WAF.  
+Find a way to bypass that WAF
 -- A Burp 1.6+ Extension  
+
+#Info
+Latest Version: 1.4 (beta)  
+Current BApp Store Version: 1.4 (beta)  
 
 #A WAF Story
 ###In WAF we trust
@@ -23,12 +27,19 @@ Blackhat (looking at Lisa): And nice WAFing tits, by the way!
 4. Empower the mighty Burp  
 
 #Installation
+## Pre-Installation
 Download jruby-complete jar file from [JRuby](http://www.jruby.org/download)  
-Copy "bapps/" to "<path>/<to>/<burp>/bapps/"
-Open your "Burp Suite"  
 Go to "Extender"  
 Go to "Options"  
 On "Ruby Environment" section set "Location of JRuby JAR file" to "\[foo\]/\[bar\]/jruby-complete-\[version\].jar"  
+
+## Using BApp Store
+Go to "Extension" > "BApp Store"  
+Find "What-The-WAF" and install it  
+
+## Manual
+Copy "bapps/" to "<path>/<to>/<burp>/bapps/"
+Open your "Burp Suite"  
 Go to "Extensions"  
 Click on "Add"  
 Set "Extension Type" to "Ruby"  
