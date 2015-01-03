@@ -16,8 +16,8 @@ Blackhat (whispering to himself while sneaking around): WAF?! that hurts.
 Lisa: Tom, You WAF, like bunnies!  
 Blackhat (whispering to himself): Just wait for the time when the shit hits the WAF, sweety!  
 Tom (notices Blackhat and says): Why don't you go outside and play hide-and-go-WAF-yourself?  
-Blackhat: Calm down tommy! When inserting your WAFstick into your own a**l cavity, take great precaution not to injure yourself.   
-Blackhat (looking at Lisa then says): And, nice WAFing t*ts, by the way!  
+Blackhat: Calm down tommy! When inserting your WAFstick into your own a\*\*l cavity, take great precaution not to injure yourself.   
+Blackhat (looking at Lisa then says): And, nice WAFing t\*ts, by the way!  
 [Blackhat leaves them alone and fires up his "What the WAF?!"]  
 [End of Story]
 
