@@ -1,5 +1,5 @@
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
-# What The WAF?! extension for burp                                                     #
+# What The WAF?! An extension for burp 1.6+                                             #
 #                                                                                       #
 # by _null_ (Sina Hatef)                                                                #
 # source code (GPLv3) is available at github: https://github.com/null--/what-the-waf    #
@@ -8,7 +8,7 @@
 # TODO                                                                                  #
 #   More informative error messages!                                                    #
 #   Better exception handling                                                           #
-#   TODO A handy panel to bypass WAF (after WAF weaknesses was discloused)              #
+#   A handy panel to bypass WAF (after a WAF-bypass was discovered)                     #
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=- #
