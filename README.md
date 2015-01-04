@@ -1,4 +1,4 @@
-Find a way to bypass that WAF
+Find your way through that WAF!    
 -- A Burp 1.6+ Extension  
 
 #Info
@@ -39,7 +39,7 @@ Go to "Extension" > "BApp Store"
 Find "What-The-WAF" and install it  
 
 ## Installation: Manual
-Copy "bapps/" to "<path>/<to>/<burp>/bapps/"
+Copy "bapps/" to "\[path\]/\[to\]\[burp\]/bapps/"  
 Open your "Burp Suite"  
 Go to "Extensions"  
 Click on "Add"  
